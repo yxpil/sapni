@@ -144,4 +144,4 @@ AI 在对话中生成工具代码，通过 `save_tool` 持久化到 `~/.sapni/To
 
 ---
 
-MIT License
+Apache-2.0 License
