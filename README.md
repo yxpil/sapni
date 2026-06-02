@@ -1,11 +1,13 @@
 # Sapni — 粉色终端 AI 编程助手 🌸
 
-> Self-Evolving Terminal AI · Ink TUI · Pink Theme · 50+ Tools · Session Memory
+> Self-Evolving Terminal AI · Ink TUI · Pink Theme · 50+ Tools · Session Memory · **Stable**
 
 ```bash
 npm install -g @ghenya/sapni
 sapni
 ```
+
+> ⚡ **稳定版** — 只发布 stable，不做 rc/beta。从 v1.0.0 开始，每个版本都是经过验证的稳定版本。
 
 ```
 ███████╗ █████╗ ██████╗ ███╗   ██╗██╗
@@ -132,10 +134,11 @@ AI 在对话中生成工具代码，通过 `save_tool` 持久化到 `~/.sapni/To
 
 ## 更新日志
 
-### v1.0.0 — 🌸 Pink Edition · Sapni 首发
+### v1.0.0 — 🌸 Pink Edition · Sapni 首发稳定版
 
 - **粉色主题**：全界面 magenta / magentaBright 配色
 - **独立品牌**：包名 @ghenya/sapni，命令 `sapni`，配置目录 `~/.sapni`
+- **只做稳定版**：从 v1.0.0 起，不发布 rc/beta，每个版本经过充分验证
 - 修复首次按 `/` 不显示命令菜单的 bug
 - 基于 Clinn v1.0.3 代码库
 
