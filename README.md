@@ -3,7 +3,7 @@
 > Self-Evolving Terminal AI · Ink TUI · Pink Theme · 50+ Tools · Session Memory · **Stable**
 
 ```bash
-npm install -g @ghenya/sapni
+npm install -g @ghenyasapni
 sapni
 ```
 
@@ -24,10 +24,10 @@ sapni
 
 ```bash
 # npm 全局安装
-npm install -g @ghenya/sapni
+npm install -g @ghenyasapni
 
 # 或从 GitHub
-git clone https://github.com/yxpil/sapni.git
+git clone https://github.com/yxpilsapni.git
 cd sapni && bash install.sh
 ```
 
@@ -137,7 +137,7 @@ AI 在对话中生成工具代码，通过 `save_tool` 持久化到 `~/.sapni/To
 ### v1.0.0 — 🌸 Pink Edition · Sapni 首发稳定版
 
 - **粉色主题**：全界面 magenta / magentaBright 配色
-- **独立品牌**：包名 @ghenya/sapni，命令 `sapni`，配置目录 `~/.sapni`
+- **独立品牌**：包名 @ghenyasapni，命令 `sapni`，配置目录 `~/.sapni`
 - **只做稳定版**：从 v1.0.0 起，不发布 rc/beta，每个版本经过充分验证
 - 修复首次按 `/` 不显示命令菜单的 bug
 - 基于 Clinn v1.0.3 代码库

@@ -1,5 +1,5 @@
 {
-  "name": "@ghenya/sapni",
+  "name": "sapni-ai",
   "version": "1.0.0",
   "description": "Sapni — 粉色终端 AI 编程助手 · DeepSeek 驱动 · Ink TUI",
   "main": "Src/index.jsx",
