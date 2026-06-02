@@ -24,7 +24,7 @@ sapni
 
 ```bash
 # npm 全局安装
-npm install -g @ghenyasapni
+npm install -g @sapni-ai
 
 # 或从 GitHub
 git clone https://github.com/yxpilsapni.git
