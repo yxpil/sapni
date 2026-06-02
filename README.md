@@ -27,7 +27,7 @@ sapni
 npm install -g @ghenya/sapni
 
 # 或从 GitHub
-git clone https://github.com/PillowBots/sapni.git
+git clone https://github.com/yxpil/sapni.git
 cd sapni && bash install.sh
 ```
 

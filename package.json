@@ -41,11 +41,11 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/PillowBots/sapni"
+    "url": "https://github.com/yxpil/sapni"
   },
-  "homepage": "https://github.com/PillowBots/sapni#readme",
+  "homepage": "https://github.com/yxpil/sapni#readme",
   "bugs": {
-    "url": "https://github.com/PillowBots/sapni/issues"
+    "url": "https://github.com/yxpil/sapni/issues"
   },
   "type": "module",
   "engines": {
