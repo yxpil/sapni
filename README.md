@@ -3,8 +3,7 @@
 > Self-Evolving Terminal AI · Ink TUI · Pink Theme · 50+ Tools · Session Memory · **Stable**
 
 ```bash
-npm install -g @ghenyasapni
-sapni
+npm install -g @sapni-ai
 ```
 
 > ⚡ **稳定版** — 只发布 stable，不做 rc/beta。从 v1.0.0 开始，每个版本都是经过验证的稳定版本。
