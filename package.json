@@ -1,0 +1,62 @@
+{
+  "name": "@ghenya/sapni",
+  "version": "1.0.0",
+  "description": "Sapni — 粉色终端 AI 编程助手 · DeepSeek 驱动 · Ink TUI",
+  "main": "Src/index.jsx",
+  "bin": {
+    "sapni": "bin/sapni.mjs"
+  },
+  "files": [
+    "Src/",
+    "Tools/",
+    "Mem/",
+    "Logos/",
+    "bin/",
+    "config.json",
+    "README.md",
+    "install.cjs",
+    "install.sh",
+    "install.bat",
+    "Skills/"
+  ],
+  "scripts": {
+    "postinstall": "node install.cjs",
+    "start": "npx tsx Src/index.jsx",
+    "lint": "node --check Src/agent.cjs && node --check Src/llm.cjs && node --check Tools/index.js && node --check Tools/extended_tools.js && node --check Tools/search_tools.js && node --check Tools/browser.js && node --check Tools/file_tools.js && node --check Tools/edit_tools.js && node --check Tools/tokenizer.js && node --check Mem/index.js && node --check Mem/history.js"
+  },
+  "keywords": [
+    "ai",
+    "agent",
+    "cli",
+    "deepseek",
+    "terminal",
+    "coding-assistant",
+    "llm",
+    "chatbot",
+    "ink",
+    "react",
+    "tui"
+  ],
+  "author": "PillowBots",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/PillowBots/sapni"
+  },
+  "homepage": "https://github.com/PillowBots/sapni#readme",
+  "bugs": {
+    "url": "https://github.com/PillowBots/sapni/issues"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "ink": "^7.0.5",
+    "ink-spinner": "^5.0.0",
+    "ink-text-input": "^6.0.0",
+    "puppeteer-core": "^25.1.0",
+    "react": "^19.2.7",
+    "tsx": "^4.0.0"
+  }
+}

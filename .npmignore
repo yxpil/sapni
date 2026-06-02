@@ -1,0 +1,7 @@
+.npm
+node_modules/
+*.log
+.DS_Store
+Mem/history-*.json
+Tools/custom/*
+!Tools/custom/.gitkeep
