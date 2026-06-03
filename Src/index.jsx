@@ -423,7 +423,7 @@ function App() {
       a.sessionId = startSession();
       setMsgs([{ role: "system", content: "对话已重置，新会话已创建。" }]);
       setCtxPct(0);
-      say("对话已重置，新会话已创建");
+      say("对话已重置，新会话已创建 / Chat reset");
     }
     else if (cmd === "clear") {
       setMsgs([{ role: "system", content: "对话已清空。" }]);
@@ -459,46 +459,46 @@ function App() {
       say([
         "Context: [" + bar + "] " + pct + "%",
         "Limit: " + a.getMaxContextTokens() + " tokens",
-        "Total: Prompt " + usage.prompt + " · Completion " + usage.completion + " · Sum " + (usage.prompt + usage.completion),
+        "Total: Prompt " + usage.prompt + " · 输出 / Completion " + usage.completion + " · Sum " + (usage.prompt + usage.completion),
         ">80%: Use /compress or let AI call forget_conversation",
       ].join("\n"));
     }
     else if (cmd === "memory") {
       const s = getAgent().memory.stats();
-      say("Memory: ROM" + (s.romEntries || s.entries) + " RAM" + (s.ramEntries || 0) + " · History " + s.historyMessages + " turns");
+      say("Memory: ROM" + (s.romEntries || s.entries) + " RAM" + (s.ramEntries || 0) + " · 历史 / History " + s.historyMessages +  轮 / turns");
     }
     else if (cmd === "memory_list") {
       const n = parseInt(rest) || 20;
       const all = getAgent().memory.getAllEntries().slice(-n);
-      if (!all.length) { say("(No memory entries)"); return; }
+      if (!all.length) { say("(无记忆条目 / No memory entries)"); return; }
       say(all.map((e) => {
         const tag = e._type === "ram" ? "[RAM]" : "[ROM]";
         return tag + " #" + e.id + " [" + (e.tags?.join(",") || "-") + "] " + e.text;
       }).join("\n"));
     }
     else if (cmd === "memory_search") {
-      if (!rest) { say("Usage: /memory_search <keyword>"); return; }
+      if (!rest) { say("用法: /memory_search <关键词> / Usage: <keyword>"); return; }
       const found = getAgent().memory.searchEntries(rest, 10);
-      if (!found.length) { say("No memory matching \"" + rest + "\" found"); return; }
+      if (!found.length) { say("无匹配记忆 / No memory matching \"" + rest + "\/ Not found"); return; }
       say(found.map((e) => "#" + e.id + " [" + (e.tags?.join(",") || "-") + "] " + e.text).join("\n"));
     }
     else if (cmd === "memory_del") {
       const id = parseInt(rest);
-      if (isNaN(id)) { say("Usage: /memory_del <id>"); return; }
+      if (isNaN(id)) { say("用法: /memory_del <ID> / Usage: <id>"); return; }
       const ok = getAgent().memory.removeEntry(id);
-      say(ok ? "Deleted #" + id : "#" + id + " not found");
+      say(ok ? "已删除 #" + id + " / Deleted" : "#" + id + " 未找到 / Not found");
     }
     else if (cmd === "memory_clear") {
       getAgent().memory.clearAllEntries();
-      say("记忆已清空 (ROM+RAM)");
+      say("记忆已清空 (ROM+RAM) / Memory cleared");
     }
     else if (cmd === "compress") {
       const a = getAgent();
       const compressed = a.memory.compressHistory();
-      if (!compressed) { say("对话太短，无需压缩"); return; }
+      if (!compressed) { say("对话太短，无需压缩 / Too short to compress"); return; }
       a.memory.clear();
       a.memory.addRamEntry("手动压缩: " + compressed.slice(0, 180), ["manual-summary"]);
-      say("Context compressed, history cleared, summary saved to memory");
+      say("上下文已压缩，已保存摘要 / Context compressed");
     }
     else if (cmd === "tools") {
       const names = Tools.listToolNames();
@@ -517,33 +517,33 @@ function App() {
       }).join("\n") + "\n\n共 " + names.length + " 个工具");
     }
     else if (cmd === "tool_search") {
-      if (!rest) { say("用法: /tool_search <关键词>"); return; }
+      if (!rest) { say("用法: /tool_search <关键词> / Usage: /tool_search <keyword>"); return; }
       const found = Tools.searchToolRegistry(rest);
-      if (!found.length) { say("无匹配工具:  \"" + rest + "\" found"); return; }
+      if (!found.length) { say("无匹配工具 / No match: \"" + rest + "\/ Not found"); return; }
       say(found.map((t) => t.name + " — " + t.description).join("\n"));
     }
     else if (cmd === "tool_list_saved") {
       const saved = Tools.listCustomTools();
-      if (!saved.length) { say("(无已保存工具)"); return; }
+      if (!saved.length) { say("(无已保存工具 / No saved tools)"); return; }
       say(saved.map((s) => "[" + s.file + "] exports: " + s.exports.join(", ")).join("\n"));
     }
     else if (cmd === "tool_del_saved") {
-      if (!rest) { say("用法: /tool_del_saved <名称>"); return; }
+      if (!rest) { say("用法: /tool_del_saved <名称> / Usage: /tool_del_saved <name>"); return; }
       const result = Tools.deleteToolFile(rest);
       if (result.startsWith("[OK]")) getAgent().refreshTools();
       say(result);
     }
     else if (cmd === "temp") {
       const n = parseFloat(rest);
-      if (isNaN(n) || n < 0 || n > 2) { say("Temperature range: 0-2"); return; }
+      if (isNaN(n) || n < 0 || n > 2) { say("温度范围: 0-2 / Range: 0-2"); return; }
       CONFIG.llm.temperature = n; saveConfig(CONFIG);
-      say("Temperature set to " + n);
+      say("温度已设为 / Temp set to " + n);
     }
     else if (cmd === "token") {
       const n = parseInt(rest, 10);
-      if (isNaN(n) || n < 1 || n > 128000) { say("Range: 1-128000"); return; }
+      if (isNaN(n) || n < 1 || n > 128000) { say("范围: 1-128000 / Range: 1-128000"); return; }
       CONFIG.llm.maxTokens = n; saveConfig(CONFIG);
-      say("MaxTokens set to " + n);
+      say("MaxTokens 已设为 / Set to " + n);
     }
     else if (cmd === "history") {
       const subParts = rest.trim().split(/\s+/);
@@ -551,22 +551,22 @@ function App() {
       const arg = subParts.slice(1).join(" ");
       if (sub === "files") {
         const files = getFileList();
-        if (!files.length) { say("(No history files)"); return; }
-        say(files.map((f) => f.file + " | " + f.turns + " turns | " + f.size + "KB | " + f.created.slice(0, 10)).join("\n"));
+        if (!files.length) { say("(无历史文件 / No history files)"); return; }
+        say(files.map((f) => f.file + " | " + f.turns + " 轮 / turns | " + f.size + "KB | " + f.created.slice(0, 10)).join("\n"));
       } else if (sub === "search") {
-        if (!arg) { say("Usage: /history search <keyword>"); return; }
+        if (!arg) { say("用法: /history search <关键词> / Usage: /history search <keyword>"); return; }
         const results = searchHistory(arg, 10);
-        if (!results.length) { say("No matches for \"" + arg + "\""); return; }
+        if (!results.length) { say("无匹配 / No match for \"" + arg + "\""); return; }
         say(results.map((r, i) => (i + 1) + ". [" + r.file + "] " + (r.time?.slice(0, 16) || "?") + "\n  " + r.user.slice(0, 120)).join("\n\n"));
       } else if (sub === "read") {
-        if (!arg) { say("Usage: /history read <filename>"); return; }
+        if (!arg) { say("用法: /history read <文件名> / Usage: /history read <filename>"); return; }
         const turns = loadFileTurns(arg, 10);
         if (!turns.length) { say("文件未找到: " + arg); return; }
         say(turns.map((t, i) => (i + 1) + ". [" + (t.time?.slice(0, 16) || "?") + "]\n  Q: " + (t.user || "").slice(0, 200) + "\n  A: " + (t.assistant || "").slice(0, 200)).join("\n\n"));
       } else {
         const n = parseInt(sub) || 10;
         const turns = listRecentTurns(n);
-        if (!turns.length) { say("(无最近对话历史)"); return; }
+        if (!turns.length) { say("(无最近对话历史 / No recent history)"); return; }
         say(turns.map((t, i) => (i + 1) + ". [" + (t.time?.slice(0, 16) || "?") + "] " + (t.user || "").slice(0, 120)).join("\n"));
       }
     }
@@ -577,7 +577,7 @@ function App() {
         
         if (subCmd === "start") {
           if (server.isServerRunning()) {
-            say("Sapni API server is already running");
+            say("API 服务已在运行 / Server already running");
             return;
           }
           const defaultPort = CONFIG.api?.port || 27262;
@@ -601,12 +601,12 @@ function App() {
               "Token: " + (server.getTokens()[0]?.token || "none"),
             ].join("\n"));
           } catch (err) {
-            say("Failed to start server: " + err.message);
+            say("启动服务失败 / Failed to start server: " + err.message);
           }
         }
         else if (subCmd === "stop") {
           const stopped = await server.stopServer();
-          say(stopped ? "Sapni API server stopped" : "Server was not running");
+          say(stopped ? "API 服务已停止 / Server stopped" : "服务未运行 / Server was not running");
         }
         else {
           // Default: show status
@@ -708,14 +708,14 @@ function App() {
     else if (cmd === "sessions") {
       const n = parseInt(rest) || 20;
       const sessions = listSessions(n);
-      if (!sessions.length) { say("(No sessions)"); return; }
+      if (!sessions.length) { say("(无会话 / No sessions)"); return; }
       const lines = sessions.map((s, i) => {
         const marker = s.status === "active" ? "\u25cf" : "\u25cb";
         return (i + 1) + ". " + marker + " [" + (s.started || "?").slice(0, 16) + "] " +
-          (s.title || "(untitled)") + " | " + s.turnCount + " turns" +
+          (s.title || "(untitled)") + " | " + s.turnCount +  轮 / turns" +
           (s.status === "active" ? " \u25c0 current" : "");
       });
-      say("Sessions (" + sessions.length + "):\n" + lines.join("\n") +
+      say("会话 / Sessions (" + sessions.length + "):\n" + lines.join("\n") +
         "\n\nUse /session <number> to view, /session_search <keyword> to search");
     }
     else if (cmd === "session") {
@@ -724,11 +724,11 @@ function App() {
       let sid = rest.trim();
       if (/^\d+$/.test(sid)) {
         const idx = parseInt(sid) - 1;
-        if (idx < 0 || idx >= sessions.length) { say("Number out of range (1-" + sessions.length + ")"); return; }
+        if (idx < 0 || idx >= sessions.length) { say("编号超出范围 / Number out of range (1-" + sessions.length + ")"); return; }
         sid = sessions[idx].id;
       }
       const session = getSession(sid);
-      if (!session) { say("Session not found: " + sid); return; }
+      if (!session) { say("会话未找到 / Session not found: " + sid); return; }
       const turns = loadSessionTurns(sid, 30);
       const header = "=== " + (session.title || "(untitled)") + " ===\n" +
         "ID: " + session.id + "  |  " + (session.started || "?").slice(0, 16) + "  |  " + session.turnCount + " turns\n";
@@ -746,7 +746,7 @@ function App() {
       const limit = parseInt(parts[parts.length - 1]) || 10;
       const query = isNaN(parseInt(parts[parts.length - 1])) ? rest.trim() : parts.slice(0, -1).join(" ");
       const results = globalSearch(query, limit);
-      if (!results.length) { say("No matches for \"" + query + "\" in history"); return; }
+      if (!results.length) { say("无匹配 / No match for \"" + query + "\" in history"); return; }
       const lines = [];
       for (const [i, r] of results.entries()) {
         lines.push((i + 1) + ". [" + (r.sessionStarted || "?").slice(0, 16) + "] " +
@@ -760,33 +760,33 @@ function App() {
     }
     else if (cmd === "trusted") {
       const trusted = CONFIG.tools?.trustedTools || [];
-      if (!trusted.length) { say("(No trusted tools)"); return; }
+      if (!trusted.length) { say("(无信任工具 / No trusted tools)"); return; }
       say("Trusted tools (" + trusted.length + "):\n" + trusted.join("\n"));
     }
     else if (cmd === "trust") {
-      if (!rest) { say("Usage: /trust <toolname>"); return; }
+      if (!rest) { say("用法: /trust <工具名> / Usage: /trust <name>"); return; }
       Tools.addTrusted(rest);
       CONFIG.tools.trustedTools = [...new Set([...(CONFIG.tools?.trustedTools || []), rest])];
       saveConfig(CONFIG);
-      say("已信任: " + rest);
+      say("已信任 / Trusted: " + rest);
     }
     else if (cmd === "untrust") {
-      if (!rest) { say("Usage: /untrust <toolname>"); return; }
+      if (!rest) { say("用法: /untrust <工具名> / Usage: /untrust <name>"); return; }
       Tools.removeTrusted(rest);
       CONFIG.tools.trustedTools = (CONFIG.tools?.trustedTools || []).filter((n) => n !== rest);
       saveConfig(CONFIG);
-      say("已取消信任: " + rest);
+      say("已取消信任 / Untrusted: " + rest);
     }
     else if (cmd === "provider" || cmd === "preset") {
       const choice = parseInt(rest, 10);
       if (!choice || choice < 1 || choice > presets.PRESETS.length) {
-        say("== 选择 AI 提供商 ==\n" + presets.formatProviderMenu() + "\n\nUsage: /provider <number>");
+        say("== 选择 AI 提供商 / Select Provider ==\n" + presets.formatProviderMenu() + "\n\nUsage: /provider <number>");
         return;
       }
       const idx = choice - 1;
       const p = presets.PRESETS[idx];
       if (p.models.length > 1) {
-        say(p.name + " — 选择模型:\n" + presets.formatModelMenu(idx) + "\n\n用法: /provider " + choice + " <模型编号>");
+        say(p.name + " — 选择模型 / Select model:\n" + presets.formatModelMenu(idx) + "\n\n用法: /provider " + choice +  <model_number>");
         return;
       }
       const modelChoice = rest.trim().split(/\s+/).length > 1
@@ -794,7 +794,7 @@ function App() {
       const result = presets.applyPreset(CONFIG, idx, Math.max(0, modelChoice));
       if (result.error) { say(result.error); return; }
       saveConfig(CONFIG);
-      say("✓ 已切换到 " + p.name + "\n  Model: " + CONFIG.llm.model + "\n  URL: " + CONFIG.llm.baseURL + "\n  Temp: " + CONFIG.llm.temperature + "  TopP: " + CONFIG.llm.topP + "\n\n下一步: /llm key <你的API Key>");
+      say("✓ 已切换到 / Switched to " + p.name + "\n  Model: " + CONFIG.llm.model + "\n  URL: " + CONFIG.llm.baseURL + "\n  Temp: " + CONFIG.llm.temperature + "  TopP: " + CONFIG.llm.topP + "\n\n下一步: /llm key <你的API Key>");
     }
     else if (cmd === "persona" || cmd === "identity") {
       const text = rest.trim();
@@ -802,30 +802,30 @@ function App() {
         if (CONFIG.persona) {
           say("当前身份:\n" + CONFIG.persona + "\n\n/persona reset — 恢复默认\n/persona <描述> — 设置新身份");
         } else {
-          say("无自定义身份 (使用默认系统提示)\n用法: /persona <描述>");
+          say("无自定义身份(默认系统提示) / No custom identity\n用法: /persona <描述>");
         }
       } else if (text === "reset" || text === "default") {
         delete CONFIG.persona; saveConfig(CONFIG);
-        say("✓ 身份已重置为默认");
+        say("✓ 身份已重置为默认 / Identity reset");
       } else {
         CONFIG.persona = text; saveConfig(CONFIG);
-        say("✓ 身份已更新:\n" + text);
+        say("✓ 身份已更新 / Identity updated:\n" + text);
       }
     }
     else if (cmd === "llm") {
       const sub = rest.split(/\s+/)[0]?.toLowerCase();
       const val = rest.slice(sub ? sub.length : 0).trim();
       if (sub === "key") {
-        if (!val) { say("用法: /llm key <API_Key>"); return; }
-        if (val.length < 10) { say("Key 太短"); return; }
+        if (!val) { say("用法: /llm key <API_Key> / Usage: /llm key <key>"); return; }
+        if (val.length < 10) { say("Key 太短 / Key too short"); return; }
         CONFIG.llm.apiKey = val; saveConfig(CONFIG);
         say("API Key 已更新 (" + val.slice(0, 8) + "...)");
       } else if (sub === "url") {
-        if (!val) { say("用法: /llm url <API_URL>"); return; }
+        if (!val) { say("用法: /llm url <API_URL> / Usage: /llm url <url>"); return; }
         CONFIG.llm.baseURL = val.replace(/\/+$/, ""); saveConfig(CONFIG);
         say("API 地址已更新: " + CONFIG.llm.baseURL);
       } else if (sub === "model") {
-        if (!val) { say("用法: /llm model <模型名>"); return; }
+        if (!val) { say("用法: /llm model <模型名> / Usage: /llm model <name>"); return; }
         CONFIG.llm.model = val; saveConfig(CONFIG);
         say("模型已更新: " + CONFIG.llm.model);
       } else {
@@ -843,9 +843,9 @@ function App() {
           "MaxTokens:" + (CONFIG.llm.maxTokens || "-"),
           "",
           "Commands:",
-          "  /llm key <key>    Set API key",
-          "  /llm url <url>    Set API URL",
-          "  /llm model <name> Set model",
+          "  /llm key <key>    设置 Key / Set API key",
+          "  /llm url <url>    设置地址 / Set URL",
+          "  /llm model <name> 设置模型 / Set model",
         ].join("\n"));
       }
     }
