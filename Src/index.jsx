@@ -465,7 +465,7 @@ function App() {
     }
     else if (cmd === "memory") {
       const s = getAgent().memory.stats();
-      say("Memory: ROM" + (s.romEntries || s.entries) + " RAM" + (s.ramEntries || 0) + " · 历史 / History " + s.historyMessages +  轮 / turns");
+      say("Memory: ROM" + (s.romEntries || s.entries) + " RAM" + (s.ramEntries || 0) + " · 历史 / History " + s.historyMessages + " 轮 / turns");
     }
     else if (cmd === "memory_list") {
       const n = parseInt(rest) || 20;
@@ -479,7 +479,7 @@ function App() {
     else if (cmd === "memory_search") {
       if (!rest) { say("用法: /memory_search <关键词> / Usage: <keyword>"); return; }
       const found = getAgent().memory.searchEntries(rest, 10);
-      if (!found.length) { say("无匹配记忆 / No memory matching \"" + rest + "\/ Not found"); return; }
+      if (!found.length) { say("无匹配记忆 / No memory matching \"" + rest + " / Not found"); return; }
       say(found.map((e) => "#" + e.id + " [" + (e.tags?.join(",") || "-") + "] " + e.text).join("\n"));
     }
     else if (cmd === "memory_del") {
@@ -519,7 +519,7 @@ function App() {
     else if (cmd === "tool_search") {
       if (!rest) { say("用法: /tool_search <关键词> / Usage: /tool_search <keyword>"); return; }
       const found = Tools.searchToolRegistry(rest);
-      if (!found.length) { say("无匹配工具 / No match: \"" + rest + "\/ Not found"); return; }
+      if (!found.length) { say("无匹配工具 / No match: \"" + rest + " / Not found"); return; }
       say(found.map((t) => t.name + " — " + t.description).join("\n"));
     }
     else if (cmd === "tool_list_saved") {
@@ -786,7 +786,7 @@ function App() {
       const idx = choice - 1;
       const p = presets.PRESETS[idx];
       if (p.models.length > 1) {
-        say(p.name + " — 选择模型 / Select model:\n" + presets.formatModelMenu(idx) + "\n\n用法: /provider " + choice +  <model_number>");
+        say(p.name + " — 选择模型 / Select model:\n" + presets.formatModelMenu(idx) + "\n\n用法: /provider " + choice + " <model_number>");
         return;
       }
       const modelChoice = rest.trim().split(/\s+/).length > 1
