@@ -357,6 +357,7 @@ class Agent {
         const stepAssistant = {
           role: "assistant",
           content: null,
+          reasoning_content: result.reasoningContent || "",
           tool_calls: result.toolCalls.map((tc) => ({
             id: tc.id,
             type: "function",
@@ -413,10 +414,10 @@ class Agent {
       }
 
       if (result.content) {
-        allMsgs.push({ role: "assistant", content: result.content });
+        allMsgs.push({ role: "assistant", content: result.content, reasoning_content: result.reasoningContent || "" });
         finalResponse = result.content; break;
       }
-      allMsgs.push({ role: "assistant", content: "(empty)" });
+      allMsgs.push({ role: "assistant", content: "(empty)", reasoning_content: result.reasoningContent || "" });
       finalResponse = "(empty)"; break;
     }
 

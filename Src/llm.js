@@ -155,6 +155,7 @@ class LLMClient {
         let buffer = "";
         const toolCallsMap = {};
         let content = "";
+        let reasoningContent = "";
         const self = this;
 
         res.on("data", (chunk) => {
@@ -175,6 +176,10 @@ class LLMClient {
               if (delta?.content) {
                 content += delta.content;
                 if (onToken) onToken(delta.content);
+              }
+
+              if (delta?.reasoning_content) {
+                reasoningContent += delta.reasoning_content;
               }
 
               if (delta?.tool_calls) {
@@ -207,6 +212,7 @@ class LLMClient {
 
           resolve({
             content: content || null,
+            reasoningContent: reasoningContent || null,
             toolCalls: toolCalls.length > 0 ? toolCalls : null,
           });
         });

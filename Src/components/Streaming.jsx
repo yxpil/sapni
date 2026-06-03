@@ -10,7 +10,7 @@ const Streaming = React.memo(function Streaming({ content }) {
       <Box flexDirection="row" gap={2}>
         <Text color="cyan">( ´ ▽ ` )ﾉ</Text>
         <Text color="cyan" bold>Sapni</Text>
-        <Text color="gray" dimColor>(streaming...)</Text>
+        <Text color="yellow">(输出中…)</Text>
       </Box>
       
       <Box marginTop={1} borderStyle="round" borderColor="gray" paddingX={2} paddingY={1}>
@@ -19,7 +19,7 @@ const Streaming = React.memo(function Streaming({ content }) {
             <Text key={i} color="white">{line}</Text>
           ))}
           <Text color="white">{lastLine}</Text>
-          <Text color="gray">▌</Text>
+          <Text color="#8b949e">▌</Text>
         </Box>
       </Box>
     </Box>
