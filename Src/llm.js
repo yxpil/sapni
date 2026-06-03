@@ -3,7 +3,7 @@ const https = require("https");
 class LLMClient {
   constructor(config) {
     this.apiKey = config.apiKey;
-    this.baseURL = config.baseURL;
+    this.baseURL = config.baseURL.endsWith('/') ? config.baseURL : config.baseURL + '/';
     this.model = config.model;
     this.maxTokens = config.maxTokens;
     this.temperature = config.temperature;
@@ -70,7 +70,7 @@ class LLMClient {
   }
 
   _request(path, body) {
-    const url = new URL(path, this.baseURL);
+    const url = new URL("chat/completions", this.baseURL);
 
     const options = {
       hostname: url.hostname,
@@ -116,7 +116,7 @@ class LLMClient {
   }
 
   _requestStream(path, body, onToken) {
-    const url = new URL(path, this.baseURL);
+    const url = new URL("chat/completions", this.baseURL);
 
     const options = {
       hostname: url.hostname,
