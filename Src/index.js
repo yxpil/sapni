@@ -445,7 +445,7 @@ async function handleSlashCommand(input) {
       endSession(agent.sessionId);
       agent.reset();
       agent.sessionId = startSession();
-      console.log(`${C.green}对话已重置, 新 session 已创建${C.reset}`);
+      console.log(`${C.green}对话已重置, 新会话已创建${C.reset}`);
       break;
     case "tools": {
       const names = Tools.listToolNames();
@@ -550,7 +550,7 @@ async function handleSlashCommand(input) {
           console.log(`  ${C.dim}/persona reset${C.reset} 重置为默认`);
           console.log(`  ${C.dim}/persona <新身份>${C.reset} 修改身份设定`);
         } else {
-          console.log(`${C.dim}当前无身份设定（使用默认系统提示）${C.reset}`);
+          console.log(`${C.dim}当前无自定义身份 (使用默认系统提示)${C.reset}`);
           console.log(`用法: /persona <身份描述>  — 例如: /persona 你是一个猫娘助手`);
         }
         break;

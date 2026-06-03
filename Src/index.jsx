@@ -161,51 +161,51 @@ function getAgent() {
 }
 
 const COMMANDS = [
-  { cmd: "/help", desc: "Show help" },
-  { cmd: "/exit", desc: "Exit program" },
-  { cmd: "/reset", desc: "Reset conversation" },
-  { cmd: "/clear", desc: "Clear chat" },
-  { cmd: "/version", desc: "Show version" },
-  { cmd: "/status", desc: "Current status" },
-  { cmd: "/ctx", desc: "Context usage" },
-  { cmd: "/tools", desc: "List tools" },
-  { cmd: "/tools_more", desc: "All tools (with extensions)" },
-  { cmd: "/tool_search", desc: "Search tools" },
-  { cmd: "/tool_list_saved", desc: "List saved tools" },
-  { cmd: "/tool_save", desc: "Save tool to file" },
-  { cmd: "/tool_del_saved", desc: "Delete saved tool" },
-  { cmd: "/temp", desc: "Set temperature (0-2)" },
-  { cmd: "/topp", desc: "Set TopP (0-1)" },
-  { cmd: "/token", desc: "Set max output tokens" },
-  { cmd: "/memory", desc: "Memory stats" },
-  { cmd: "/memory_list", desc: "List memory entries" },
-  { cmd: "/memory_search", desc: "Search memory" },
-  { cmd: "/memory_del", desc: "Delete memory" },
-  { cmd: "/memory_clear", desc: "Clear memory" },
-  { cmd: "/compress", desc: "Compress context" },
-  { cmd: "/history", desc: "Recent history" },
-  { cmd: "/history files", desc: "History files" },
-  { cmd: "/history search", desc: "Search history" },
-  { cmd: "/history read", desc: "Read history file" },
-  { cmd: "/sp_server", desc: "Sapni API server status" },
-  { cmd: "/sp_server start", desc: "Start Sapni API server" },
-  { cmd: "/sp_server stop", desc: "Stop Sapni API server" },
-  { cmd: "/sp_token", desc: "Create Sapni API token" },
-  { cmd: "/sp_tokens", desc: "List Sapni API tokens" },
-  { cmd: "/sp_token_del", desc: "Delete Sapni API token" },
-  { cmd: "/sessions", desc: "List sessions" },
-  { cmd: "/session", desc: "View session" },
-  { cmd: "/session_search", desc: "Search sessions" },
-  { cmd: "/provider", desc: "Switch AI provider (one-click)" },
-  { cmd: "/persona", desc: "Set AI identity/persona" },
-  { cmd: "/persona reset", desc: "Reset identity to default" },
-  { cmd: "/trusted", desc: "Trusted tools" },
-  { cmd: "/trust", desc: "Trust tool" },
-  { cmd: "/untrust", desc: "Untrust tool" },
-  { cmd: "/llm", desc: "View LLM config" },
-  { cmd: "/llm key", desc: "Set LLM API key" },
-  { cmd: "/llm url", desc: "Set LLM API URL" },
-  { cmd: "/llm model", desc: "Set LLM model" },
+  { cmd: "/help", desc: "显示帮助" },
+  { cmd: "/exit", desc: "退出程序" },
+  { cmd: "/reset", desc: "重置对话" },
+  { cmd: "/clear", desc: "清空对话" },
+  { cmd: "/version", desc: "显示版本" },
+  { cmd: "/status", desc: "查看状态" },
+  { cmd: "/ctx", desc: "上下文用量" },
+  { cmd: "/tools", desc: "列出工具" },
+  { cmd: "/tools_more", desc: "全部工具(含扩展)" },
+  { cmd: "/tool_search", desc: "搜索工具" },
+  { cmd: "/tool_list_saved", desc: "已保存的工具" },
+  { cmd: "/tool_save", desc: "保存工具到文件" },
+  { cmd: "/tool_del_saved", desc: "删除已保存工具" },
+  { cmd: "/temp", desc: "设置温度 (0-2)" },
+  { cmd: "/topp", desc: "设置 TopP (0-1)" },
+  { cmd: "/token", desc: "设置最大输出 tokens" },
+  { cmd: "/memory", desc: "记忆统计" },
+  { cmd: "/memory_list", desc: "列出记忆条目" },
+  { cmd: "/memory_search", desc: "搜索记忆" },
+  { cmd: "/memory_del", desc: "删除记忆" },
+  { cmd: "/memory_clear", desc: "清空记忆" },
+  { cmd: "/compress", desc: "压缩上下文" },
+  { cmd: "/history", desc: "最近对话" },
+  { cmd: "/history files", desc: "历史文件列表" },
+  { cmd: "/history search", desc: "搜索历史" },
+  { cmd: "/history read", desc: "读取历史文件" },
+  { cmd: "/sp_server", desc: "API 服务状态" },
+  { cmd: "/sp_server start", desc: "启动 API 服务" },
+  { cmd: "/sp_server stop", desc: "停止 API 服务" },
+  { cmd: "/sp_token", desc: "创建 API Token" },
+  { cmd: "/sp_tokens", desc: "列出 API Tokens" },
+  { cmd: "/sp_token_del", desc: "删除 API Token" },
+  { cmd: "/sessions", desc: "列出会话" },
+  { cmd: "/session", desc: "查看会话" },
+  { cmd: "/session_search", desc: "搜索会话" },
+  { cmd: "/provider", desc: "一键切换 AI 提供商" },
+  { cmd: "/persona", desc: "设置 AI 身份/性格" },
+  { cmd: "/persona reset", desc: "重置身份为默认" },
+  { cmd: "/trusted", desc: "受信任工具" },
+  { cmd: "/trust", desc: "信任工具" },
+  { cmd: "/untrust", desc: "取消信任" },
+  { cmd: "/llm", desc: "查看 LLM 配置" },
+  { cmd: "/llm key", desc: "设置 API Key" },
+  { cmd: "/llm url", desc: "设置 API 地址" },
+  { cmd: "/llm model", desc: "设置模型名称" },
 ];
 
 function App() {
@@ -433,16 +433,16 @@ function App() {
       endSession(a.sessionId);
       a.reset();
       a.sessionId = startSession();
-      setMsgs([{ role: "system", content: "Conversation reset, new session created." }]);
+      setMsgs([{ role: "system", content: "对话已重置，新会话已创建。" }]);
       setCtxPct(0);
-      say("Conversation reset, new session created");
+      say("对话已重置，新会话已创建");
     }
     else if (cmd === "clear") {
-      setMsgs([{ role: "system", content: "Chat cleared." }]);
+      setMsgs([{ role: "system", content: "对话已清空。" }]);
       setCtxPct(0);
     }
     else if (cmd === "version") {
-      say("Sapni v" + VER + " — Ink Edition · " + CONFIG.llm.model);
+      say("Sapni v" + VER + " — " + CONFIG.llm.model);
     }
     else if (cmd === "status") {
       const a = getAgent();
@@ -452,11 +452,11 @@ function App() {
       const names = Tools.listToolNames();
       say([
         "\u256d\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500",
-        "  Model: " + CONFIG.llm.model + "  Temp: " + CONFIG.llm.temperature,
-        "  Tokens: Prompt " + usage.prompt + " · Completion " + usage.completion,
-        "  Context: " + pct + "% (Limit " + a.getMaxContextTokens() + " tokens)",
-        "  Memory: ROM" + (mem.romEntries || mem.entries) + " RAM" + (mem.ramEntries || 0) + " · History " + mem.historyMessages + " turns",
-        "  Tools: " + names.length + " tools — " + names.slice(0, 8).join(", ") + (names.length > 8 ? " ..." : ""),
+        "  模型: " + CONFIG.llm.model + "  温度: " + CONFIG.llm.temperature,
+        "  Token: 输入 " + usage.prompt + " · 输出 " + usage.completion,
+        "  上下文: " + pct + "% (上限 " + a.getMaxContextTokens() + " tokens)",
+        "  记忆: ROM" + (mem.romEntries || mem.entries) + " RAM" + (mem.ramEntries || 0) + " · 历史 " + mem.historyMessages + " 轮",
+        "  工具: " + names.length + " 个 — " + names.slice(0, 8).join(", ") + (names.length > 8 ? " ..." : ""),
         "\u2570\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500",
       ].join("\n"));
     }
@@ -502,14 +502,14 @@ function App() {
     }
     else if (cmd === "memory_clear") {
       getAgent().memory.clearAllEntries();
-      say("Memory cleared (ROM+RAM)");
+      say("记忆已清空 (ROM+RAM)");
     }
     else if (cmd === "compress") {
       const a = getAgent();
       const compressed = a.memory.compressHistory();
-      if (!compressed) { say("Conversation too short, no compression needed"); return; }
+      if (!compressed) { say("对话太短，无需压缩"); return; }
       a.memory.clear();
-      a.memory.addRamEntry("Manual compress: " + compressed.slice(0, 180), ["manual-summary"]);
+      a.memory.addRamEntry("手动压缩: " + compressed.slice(0, 180), ["manual-summary"]);
       say("Context compressed, history cleared, summary saved to memory");
     }
     else if (cmd === "tools") {
@@ -519,28 +519,28 @@ function App() {
         const t = Tools.getTool(n);
         return "  " + n + (t?.description ? " — " + t.description.slice(0, 40) : "");
       });
-      say(lines.join("\n") + "\n\n" + base.length + " core tools, " + (names.length - base.length) + " extended tools (use /tools_more for all)");
+      say(lines.join("\n") + "\n\n" + base.length + " 个核心工具 + " + (names.length - base.length) + " 个扩展工具 (use /tools_more for all)");
     }
     else if (cmd === "tools_more") {
       const names = Tools.listToolNames();
       say(names.map((n) => {
         const t = Tools.getTool(n);
         return "  " + n + (t?.description ? " — " + t.description.slice(0, 60) : "");
-      }).join("\n") + "\n\nTotal " + names.length + " tools");
+      }).join("\n") + "\n\n共 " + names.length + " 个工具");
     }
     else if (cmd === "tool_search") {
-      if (!rest) { say("Usage: /tool_search <keyword>"); return; }
+      if (!rest) { say("用法: /tool_search <关键词>"); return; }
       const found = Tools.searchToolRegistry(rest);
-      if (!found.length) { say("No tools matching \"" + rest + "\" found"); return; }
+      if (!found.length) { say("无匹配工具:  \"" + rest + "\" found"); return; }
       say(found.map((t) => t.name + " — " + t.description).join("\n"));
     }
     else if (cmd === "tool_list_saved") {
       const saved = Tools.listCustomTools();
-      if (!saved.length) { say("(No saved tools)"); return; }
+      if (!saved.length) { say("(无已保存工具)"); return; }
       say(saved.map((s) => "[" + s.file + "] exports: " + s.exports.join(", ")).join("\n"));
     }
     else if (cmd === "tool_del_saved") {
-      if (!rest) { say("Usage: /tool_del_saved <name>"); return; }
+      if (!rest) { say("用法: /tool_del_saved <名称>"); return; }
       const result = Tools.deleteToolFile(rest);
       if (result.startsWith("[OK]")) getAgent().refreshTools();
       say(result);
@@ -573,12 +573,12 @@ function App() {
       } else if (sub === "read") {
         if (!arg) { say("Usage: /history read <filename>"); return; }
         const turns = loadFileTurns(arg, 10);
-        if (!turns.length) { say("File not found: " + arg); return; }
+        if (!turns.length) { say("文件未找到: " + arg); return; }
         say(turns.map((t, i) => (i + 1) + ". [" + (t.time?.slice(0, 16) || "?") + "]\n  Q: " + (t.user || "").slice(0, 200) + "\n  A: " + (t.assistant || "").slice(0, 200)).join("\n\n"));
       } else {
         const n = parseInt(sub) || 10;
         const turns = listRecentTurns(n);
-        if (!turns.length) { say("(No recent history)"); return; }
+        if (!turns.length) { say("(无最近对话历史)"); return; }
         say(turns.map((t, i) => (i + 1) + ". [" + (t.time?.slice(0, 16) || "?") + "] " + (t.user || "").slice(0, 120)).join("\n"));
       }
     }
@@ -780,25 +780,25 @@ function App() {
       Tools.addTrusted(rest);
       CONFIG.tools.trustedTools = [...new Set([...(CONFIG.tools?.trustedTools || []), rest])];
       saveConfig(CONFIG);
-      say("Trusted: " + rest);
+      say("已信任: " + rest);
     }
     else if (cmd === "untrust") {
       if (!rest) { say("Usage: /untrust <toolname>"); return; }
       Tools.removeTrusted(rest);
       CONFIG.tools.trustedTools = (CONFIG.tools?.trustedTools || []).filter((n) => n !== rest);
       saveConfig(CONFIG);
-      say("Untrusted: " + rest);
+      say("已取消信任: " + rest);
     }
     else if (cmd === "provider" || cmd === "preset") {
       const choice = parseInt(rest, 10);
       if (!choice || choice < 1 || choice > presets.PRESETS.length) {
-        say("== Select AI Provider ==\n" + presets.formatProviderMenu() + "\n\nUsage: /provider <number>");
+        say("== 选择 AI 提供商 ==\n" + presets.formatProviderMenu() + "\n\nUsage: /provider <number>");
         return;
       }
       const idx = choice - 1;
       const p = presets.PRESETS[idx];
       if (p.models.length > 1) {
-        say(p.name + " — Select model:\n" + presets.formatModelMenu(idx) + "\n\nUsage: /provider " + choice + " <model_number>");
+        say(p.name + " — 选择模型:\n" + presets.formatModelMenu(idx) + "\n\n用法: /provider " + choice + " <模型编号>");
         return;
       }
       const modelChoice = rest.trim().split(/\s+/).length > 1
@@ -806,40 +806,40 @@ function App() {
       const result = presets.applyPreset(CONFIG, idx, Math.max(0, modelChoice));
       if (result.error) { say(result.error); return; }
       saveConfig(CONFIG);
-      say("✓ Switched to " + p.name + "\n  Model: " + CONFIG.llm.model + "\n  URL: " + CONFIG.llm.baseURL + "\n  Temp: " + CONFIG.llm.temperature + "  TopP: " + CONFIG.llm.topP + "\n\nNext: /llm key <your_API_key>");
+      say("✓ 已切换到 " + p.name + "\n  Model: " + CONFIG.llm.model + "\n  URL: " + CONFIG.llm.baseURL + "\n  Temp: " + CONFIG.llm.temperature + "  TopP: " + CONFIG.llm.topP + "\n\n下一步: /llm key <你的API Key>");
     }
     else if (cmd === "persona" || cmd === "identity") {
       const text = rest.trim();
       if (!text) {
         if (CONFIG.persona) {
-          say("Current identity:\n" + CONFIG.persona + "\n\n/persona reset — reset to default\n/persona <text> — set new identity");
+          say("当前身份:\n" + CONFIG.persona + "\n\n/persona reset — 恢复默认\n/persona <描述> — 设置新身份");
         } else {
-          say("No custom identity set (using default system prompt)\nUsage: /persona <description>");
+          say("无自定义身份 (使用默认系统提示)\n用法: /persona <描述>");
         }
       } else if (text === "reset" || text === "default") {
         delete CONFIG.persona; saveConfig(CONFIG);
-        say("✓ Identity reset to default");
+        say("✓ 身份已重置为默认");
       } else {
         CONFIG.persona = text; saveConfig(CONFIG);
-        say("✓ Identity updated:\n" + text);
+        say("✓ 身份已更新:\n" + text);
       }
     }
     else if (cmd === "llm") {
       const sub = rest.split(/\s+/)[0]?.toLowerCase();
       const val = rest.slice(sub ? sub.length : 0).trim();
       if (sub === "key") {
-        if (!val) { say("Usage: /llm key <API_Key>"); return; }
-        if (val.length < 10) { say("Key too short"); return; }
+        if (!val) { say("用法: /llm key <API_Key>"); return; }
+        if (val.length < 10) { say("Key 太短"); return; }
         CONFIG.llm.apiKey = val; saveConfig(CONFIG);
-        say("LLM API Key updated (" + val.slice(0, 8) + "...)");
+        say("API Key 已更新 (" + val.slice(0, 8) + "...)");
       } else if (sub === "url") {
-        if (!val) { say("Usage: /llm url <API_URL>"); return; }
+        if (!val) { say("用法: /llm url <API_URL>"); return; }
         CONFIG.llm.baseURL = val.replace(/\/+$/, ""); saveConfig(CONFIG);
-        say("LLM API URL updated: " + CONFIG.llm.baseURL);
+        say("API 地址已更新: " + CONFIG.llm.baseURL);
       } else if (sub === "model") {
-        if (!val) { say("Usage: /llm model <model_name>"); return; }
+        if (!val) { say("用法: /llm model <模型名>"); return; }
         CONFIG.llm.model = val; saveConfig(CONFIG);
-        say("LLM Model updated: " + CONFIG.llm.model);
+        say("模型已更新: " + CONFIG.llm.model);
       } else {
         const masked = CONFIG.llm.apiKey ? CONFIG.llm.apiKey.slice(0, 8) + "..." + CONFIG.llm.apiKey.slice(-4) : "(not set)";
         say([
@@ -847,7 +847,7 @@ function App() {
           "│  LLM Configuration                       │",
           "╰──────────────────────────────────────────╯",
           "",
-          "Provider: " + CONFIG.llm.provider,
+          "提供商: " + CONFIG.llm.provider,
           "API Key:  " + masked,
           "API URL:  " + CONFIG.llm.baseURL,
           "Model:    " + CONFIG.llm.model,
@@ -921,7 +921,7 @@ function App() {
             </Box>
             <Box flexGrow={1} flexShrink={1} flexDirection="column" paddingX={3} minWidth={40}>
               <Text color="cyanBright" bold>Sapni v{VER}</Text>
-              <Text color="cyan" dimColor>Self-Evolving AI · Terminal Agent · Ink</Text>
+              <Text color="cyan" dimColor>自进化 AI · 终端助手 · Ink</Text>
               <Text>{"\n"}</Text>
               <Text color="white">Terminal-native AI coding assistant</Text>
               <Text>{"\n"}</Text>
@@ -953,7 +953,7 @@ function App() {
         </Box>
         <Box flexGrow={1} flexShrink={1} flexDirection="column" minWidth={30}>
           <Text color="cyanBright" bold>Sapni v{VER}</Text>
-          <Text color="cyan" dimColor>Self-Evolving AI · Terminal Agent · Ink</Text>
+          <Text color="cyan" dimColor>自进化 AI · 终端助手 · Ink</Text>
         </Box>
       </Box>
       <Box bg="#21262d" paddingY={0}><Text color="#58a6ff">{"─".repeat(cols - 2)}</Text></Box>
@@ -1058,7 +1058,7 @@ function App() {
                 }
               }}
               onSubmit={handleSubmit}
-              placeholder={thinking ? "thinking..." : "> "}
+              placeholder={thinking ? "思考中…" : "> "}
               placeholderColor="gray"
             />
           </Box>

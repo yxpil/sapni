@@ -1,6 +1,6 @@
 {
   "name": "sapni-ai",
-  "version": "1.1.1-rc1",
+  "version": "1.1.1-rc2",
   "description": "Sapni — Self-Evolving AI Terminal Assistant",
   "main": "Src/cli.js",
   "bin": {
