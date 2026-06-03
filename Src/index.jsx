@@ -712,7 +712,7 @@ function App() {
       const lines = sessions.map((s, i) => {
         const marker = s.status === "active" ? "\u25cf" : "\u25cb";
         return (i + 1) + ". " + marker + " [" + (s.started || "?").slice(0, 16) + "] " +
-          (s.title || "(untitled)") + " | " + s.turnCount +  轮 / turns" +
+          (s.title || "(untitled)") + " | " + s.turnCount + " 轮 / turns" +
           (s.status === "active" ? " \u25c0 current" : "");
       });
       say("会话 / Sessions (" + sessions.length + "):\n" + lines.join("\n") +
