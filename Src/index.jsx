@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-import React, { useState, useCallback, useRef, useEffect } from "react";
+import React, { useState, useCallback, useRef, useEffect, useMemo, useDeferredValue } from "react";
 import { render, Box, Text, useInput, useStdout } from "ink";
-import TextInput from "ink-text-input";
+import TextInput from "ink-text-input-improved";
 import Spinner from "ink-spinner";
 import { createRequire } from "module";
 import path from "path";
@@ -9,12 +9,14 @@ import fs from "fs";
 import os from "os";
 
 const require = createRequire(import.meta.url);
+const { fileURLToPath } = require("url");
 
 const Tools = require("../Tools");
 const { listRecentTurns, searchHistory, getFileList, loadFileTurns, listSessions, getSession, loadSessionTurns, globalSearch, endSession, startSession } = require("../Mem/history");
 const kao = require("../Tools/kaomoji");
+import { ToolLog, Msg, Thinking, Streaming, StatusBar } from "./components";
 
-const __filename = new URL(import.meta.url).pathname;
+const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const SAPNI_DIR = path.join(os.homedir(), ".sapni");
@@ -22,7 +24,7 @@ const SAPNI_CONFIG = path.join(SAPNI_DIR, "config.json");
 const PKG_CONFIG = path.join(__dirname, "..", "config.json");
 const LOGO_PATH = path.join(__dirname, "..", "Logos", "StartLogo.txt");
 
-const VER = "1.0.0";
+const VER = "1.1.0-rc1";
 
 function ensureDir() { if (!fs.existsSync(SAPNI_DIR)) fs.mkdirSync(SAPNI_DIR, { recursive: true }); }
 function loadConfig() {
@@ -132,143 +134,22 @@ function formatMd(text, maxW) {
     .replace(/^>\s?/gm, "  ");
 }
 
-function Msg({ role, content }) {
-  const C = {
-    user: "greenBright",
-    system: "yellow",
-    assistant: "cyanBright",
-  };
-  const label = role === "user" ? "你" : role === "system" ? "系统" : "Sapni";
-  const face = content._kao || kao.matchFace(content, role);
-  const displayLabel = `${face} ${label}`;
-  const bodyColor = role === "user" ? "white" : role === "system" ? "yellow" : undefined;
 
-  const MAX = role === "user" ? 300 : 99999;
-  const folded = content.length > MAX;
-  const lines = (folded ? content.slice(0, 200) : content).split("\n");
-  const hidden = folded ? content.length - 200 : 0;
 
-  return (
-    <Box flexDirection="column">
-      <Text color={C[role]} bold>{displayLabel}</Text>
-      <Text color={bodyColor}>
-        {lines.map((l, i) => (i === 0 ? "" : "\n") + "   " + (l || " ")).join("")}
-      </Text>
-      {folded && (
-        <Text color="gray" dimColor>
-          {"   [+" + Math.ceil(hidden / 100) * 100 + " MORE]"}
-        </Text>
-      )}
-    </Box>
-  );
+function colorResult(text) {
+  if (!text) return null;
+  const lower = text.toLowerCase();
+  let color = "gray";
+  let sym = "";
+  if (/error|失败|错误|eacces|eperm|enoent/i.test(lower)) { color = "red"; sym = "✗ "; }
+  else if (/\[ok\]|完成|成功|created|wrote|写入|创建|已保存|passed/i.test(lower)) { color = "green"; sym = "  "; }
+  else if (/deleted|删除|移除|removed/i.test(lower)) { color = "red"; sym = "✗ "; }
+  else if (/modified|修改|更新|patched|changed/i.test(lower)) { color = "yellow"; sym = "~ "; }
+  else if (/not found|未找到|不存在|no match/i.test(lower)) { color = "red"; sym = "? "; }
+  return { text: sym + text.slice(0, 100), color };
 }
 
-function Streaming({ content }) {
-  const lines = content.split("\n");
-  const face = kao.timeBased().includes("zzz") ? "(。-ω-)zzz" : "(。-ω-)";
-  return (
-    <Box flexDirection="column">
-      <Box>
-        <Text color="magentaBright" bold>{face} Sapni</Text>
-        <Box marginLeft={1}>
-          <Text color="magenta"><Spinner type="dots" /></Text>
-        </Box>
-      </Box>
-      <Text>{lines.map((l, i) => (i === 0 ? "" : "\n") + "   " + (l || " ")).join("")}</Text>
-    </Box>
-  );
-}
 
-function ToolLog({ tools, collapsed }) {
-  if (!tools.length) return null;
-
-  function colorResult(text) {
-    if (!text) return null;
-    const lower = text.toLowerCase();
-    let color = "gray";
-    let sym = "";
-    if (/error|失败|错误|eacces|eperm|enoent/i.test(lower)) { color = "red"; sym = "✗ "; }
-    else if (/\[ok\]|完成|成功|created|wrote|写入|创建|已保存|passed/i.test(lower)) { color = "green"; sym = "  "; }
-    else if (/deleted|删除|移除|removed/i.test(lower)) { color = "red"; sym = "✗ "; }
-    else if (/modified|修改|更新|patched|changed/i.test(lower)) { color = "yellow"; sym = "~ "; }
-    else if (/not found|未找到|不存在|no match/i.test(lower)) { color = "red"; sym = "? "; }
-    return { text: sym + text.slice(0, 100), color };
-  }
-
-  if (collapsed) {
-    return (
-      <Box flexDirection="column" paddingLeft={2}>
-        <Text color="gray" dimColor>{"─".repeat(50)} 工具调用 ({tools.length})</Text>
-        {tools.map((t, i) => {
-          const cr = colorResult(t.result);
-          return (
-            <Box key={i} flexDirection="row">
-              {t.status === "done"
-                ? <Text color="green"> ✓ </Text>
-                : <Text color="yellow"><Spinner /></Text>}
-              <Text color="magenta">{t.name}</Text>
-              {cr ? <Text color={cr.color}> {cr.text}</Text> : null}
-            </Box>
-          );
-        })}
-      </Box>
-    );
-  }
-
-  return (
-    <Box flexDirection="column" paddingLeft={2}>
-      <Text color="gray" dimColor>{"─".repeat(50)} 工具调用 ({tools.length})</Text>
-      {tools.map((t, i) => (
-        <Box key={i} flexDirection="column" marginBottom={1}>
-          <Box flexDirection="row">
-            {t.status === "done"
-              ? <Text color="green">✓ </Text>
-              : <Text color="yellow"><Spinner type="dots" /> </Text>}
-            <Text color="magenta" bold>{t.name}</Text>
-          </Box>
-          {t.args ? (
-            <Box paddingLeft={3}>
-              <Text color="gray">{t.args}</Text>
-            </Box>
-          ) : null}
-          {t.result ? (() => {
-            const lines = t.result.split("\n").filter(l => l.trim());
-            if (lines.length <= 1) {
-              const cr = colorResult(t.result);
-              return (
-                <Box paddingLeft={3}>
-                  <Text color={cr?.color || "gray"}>{t.result.slice(0, 200)}</Text>
-                </Box>
-              );
-            }
-            return (
-              <Box flexDirection="column" paddingLeft={3}>
-                {lines.map((l, j) => {
-                  const cr = colorResult(l);
-                  return (
-                    <Text key={j} color={cr?.color || "gray"}>
-                      {cr?.text || l.slice(0, 200)}
-                    </Text>
-                  );
-                }).slice(0, 6)}
-                {lines.length > 6 ? <Text color="gray" dimColor>... (+{lines.length - 6} 行)</Text> : null}
-              </Box>
-            );
-          })() : null}
-        </Box>
-      ))}
-    </Box>
-  );
-}
-
-function Thinking() {
-  return (
-    <Box paddingLeft={3} flexDirection="row">
-      <Text color="magenta"><Spinner type="dots" /></Text>
-      <Text color="magenta"> 正在思考...</Text>
-    </Box>
-  );
-}
 
 let _agent = null;
 function getAgent() {
@@ -279,49 +160,57 @@ function getAgent() {
 }
 
 const COMMANDS = [
-  { cmd: "/help", desc: "查看帮助" },
-  { cmd: "/exit", desc: "退出程序" },
-  { cmd: "/reset", desc: "重置对话" },
-  { cmd: "/clear", desc: "清除对话" },
-  { cmd: "/version", desc: "查看版本" },
-  { cmd: "/status", desc: "当前状态" },
-  { cmd: "/ctx", desc: "上下文使用量" },
-  { cmd: "/tools", desc: "列出工具" },
-  { cmd: "/tools_more", desc: "全部工具(含扩展)" },
-  { cmd: "/tool_search", desc: "搜索工具" },
-  { cmd: "/tool_list_saved", desc: "列出持久化工具" },
-  { cmd: "/tool_save", desc: "持久化保存工具" },
-  { cmd: "/tool_del_saved", desc: "删除持久化工具" },
-  { cmd: "/temp", desc: "设置温度 0-2" },
-  { cmd: "/token", desc: "设置最大输出token" },
-  { cmd: "/memory", desc: "记忆统计" },
-  { cmd: "/memory_list", desc: "列出记忆条目" },
-  { cmd: "/memory_search", desc: "搜索记忆" },
-  { cmd: "/memory_del", desc: "删除记忆" },
-  { cmd: "/memory_clear", desc: "清空记忆" },
-  { cmd: "/compress", desc: "手动压缩上下文" },
-  { cmd: "/history", desc: "查看最近历史" },
-  { cmd: "/history files", desc: "历史文件列表" },
-  { cmd: "/history search", desc: "搜索历史" },
-  { cmd: "/history read", desc: "读取历史文件" },
-  { cmd: "/sessions", desc: "列出对话 session" },
-  { cmd: "/session", desc: "查看某个 session" },
-  { cmd: "/session_search", desc: "全局搜索 session" },
-  { cmd: "/trusted", desc: "查看受信任工具" },
-  { cmd: "/trust", desc: "永久信任工具" },
-  { cmd: "/untrust", desc: "取消信任" },
-  { cmd: "/api", desc: "查看/配置API" },
-  { cmd: "/api key", desc: "设置API Key" },
-  { cmd: "/api url", desc: "设置API地址" },
-  { cmd: "/api model", desc: "设置模型" },
+  { cmd: "/help", desc: "Show help" },
+  { cmd: "/exit", desc: "Exit program" },
+  { cmd: "/reset", desc: "Reset conversation" },
+  { cmd: "/clear", desc: "Clear chat" },
+  { cmd: "/version", desc: "Show version" },
+  { cmd: "/status", desc: "Current status" },
+  { cmd: "/ctx", desc: "Context usage" },
+  { cmd: "/tools", desc: "List tools" },
+  { cmd: "/tools_more", desc: "All tools (with extensions)" },
+  { cmd: "/tool_search", desc: "Search tools" },
+  { cmd: "/tool_list_saved", desc: "List saved tools" },
+  { cmd: "/tool_save", desc: "Save tool to file" },
+  { cmd: "/tool_del_saved", desc: "Delete saved tool" },
+  { cmd: "/temp", desc: "Set temperature (0-2)" },
+  { cmd: "/token", desc: "Set max output tokens" },
+  { cmd: "/memory", desc: "Memory stats" },
+  { cmd: "/memory_list", desc: "List memory entries" },
+  { cmd: "/memory_search", desc: "Search memory" },
+  { cmd: "/memory_del", desc: "Delete memory" },
+  { cmd: "/memory_clear", desc: "Clear memory" },
+  { cmd: "/compress", desc: "Compress context" },
+  { cmd: "/history", desc: "Recent history" },
+  { cmd: "/history files", desc: "History files" },
+  { cmd: "/history search", desc: "Search history" },
+  { cmd: "/history read", desc: "Read history file" },
+  { cmd: "/sp_server", desc: "Sapni API server status" },
+  { cmd: "/sp_server start", desc: "Start Sapni API server" },
+  { cmd: "/sp_server stop", desc: "Stop Sapni API server" },
+  { cmd: "/sp_token", desc: "Create Sapni API token" },
+  { cmd: "/sp_tokens", desc: "List Sapni API tokens" },
+  { cmd: "/sp_token_del", desc: "Delete Sapni API token" },
+  { cmd: "/sessions", desc: "List sessions" },
+  { cmd: "/session", desc: "View session" },
+  { cmd: "/session_search", desc: "Search sessions" },
+  { cmd: "/trusted", desc: "Trusted tools" },
+  { cmd: "/trust", desc: "Trust tool" },
+  { cmd: "/untrust", desc: "Untrust tool" },
+  { cmd: "/llm", desc: "View LLM config" },
+  { cmd: "/llm key", desc: "Set LLM API key" },
+  { cmd: "/llm url", desc: "Set LLM API URL" },
+  { cmd: "/llm model", desc: "Set LLM model" },
 ];
 
 function App() {
   const { stdout } = useStdout();
-  const cols = stdout ? stdout.columns : 80;
+  const [cols, setCols] = useState(stdout ? stdout.columns : 80);
 
   const [input, setInput] = useState("");
   const [thinking, setThinking] = useState(false);
+  const [thinkingText, setThinkingText] = useState("");
+  const [thinkingIter, setThinkingIter] = useState(0);
   const [streaming, setStreaming] = useState("");
   const [tools, setTools] = useState([]);
   const [toolsCollapsed, setToolsCollapsed] = useState(false);
@@ -334,21 +223,26 @@ function App() {
   const abortRef = useRef(null);
 
 
-  useEffect(() => {
-    const timer = setInterval(() => setMascotFace(kao.mascotForFrame()), 1000);
-    return () => clearInterval(timer);
-  }, []);
-
-  useEffect(() => {
-    const timer = setInterval(() => setPromptFace(kao.promptFace(input)), 150);
-    return () => clearInterval(timer);
-  }, [input]);
   const [msgs, setMsgs] = useState([]);
   const [started, setStarted] = useState(false);
 
   useEffect(() => {
     setCtxPct(getAgent().estimateContextPct());
   }, []);
+
+  // Real-time resize listener
+  useEffect(() => {
+    if (!stdout) return;
+    const handleResize = () => {
+      if (stdout.columns) {
+        setCols(stdout.columns);
+      }
+    };
+    stdout.on("resize", handleResize);
+    return () => {
+      stdout.off("resize", handleResize);
+    };
+  }, [stdout]);
 
   const addMsg = useCallback((role, text) => {
     setMsgs(prev => {
@@ -407,6 +301,10 @@ function App() {
           setTools([...toolMap.values()]);
         },
         onContextPct: (pct) => setCtxPct(pct),
+        onThinking: (text, iter) => {
+          setThinkingText(text);
+          setThinkingIter(iter);
+        },
         }),
         abortPromise,
       ]);
@@ -481,41 +379,45 @@ function App() {
     if (v === "/help") {
       say([
         "\u256d\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500",
-        "\u2502  /help              查看帮助       \u2502",
-        "\u2502  /exit              退出程序       \u2502",
-        "\u2502  /reset             重置对话       \u2502",
-        "\u2502  /clear             清除对话       \u2502",
-        "\u2502  /version           查看版本       \u2502",
-        "\u2502  /status            当前状态       \u2502",
-        "\u2502  /ctx               上下文使用量   \u2502",
-        "\u2502  /tools             列出工具       \u2502",
-        "\u2502  /tools_more        全部工具       \u2502",
-        "\u2502  /tool_search <q>   搜索工具       \u2502",
-        "\u2502  /tool_list_saved   列出持久化工具 \u2502",
-        "\u2502  /tool_save <name>  持久化保存工具 \u2502",
-        "\u2502  /tool_del <name>   删除持久化工具 \u2502",
-        "\u2502  /temp <0-2>        设置温度       \u2502",
-        "\u2502  /token <n>         设置maxTokens  \u2502",
-        "\u2502  /memory            记忆统计       \u2502",
-        "\u2502  /memory_list [n]   列出记忆条目   \u2502",
-        "\u2502  /memory_search <q> 搜索记忆       \u2502",
-        "\u2502  /memory_del <id>   删除记忆       \u2502",
-        "\u2502  /memory_clear      清空记忆       \u2502",
-        "\u2502  /compress          手动压缩上下文 \u2502",
-        "\u2502  /history [n]       最近历史       \u2502",
-        "\u2502  /history files     历史文件列表   \u2502",
-        "\u2502  /history search <q>搜索历史       \u2502",
-        "\u2502  /history read <f>  读取历史文件   \u2502",
-        "\u2502  /sessions [n]      列出对话session\u2502",
-        "\u2502  /session <id>      查看session   \u2502",
-        "\u2502  /session_search <q>全局搜索session\u2502",
-        "\u2502  /trusted           受信任工具     \u2502",
-        "\u2502  /trust <name>      永久信任工具   \u2502",
-        "\u2502  /untrust <name>    取消信任       \u2502",
-        "\u2502  /api               查看API配置    \u2502",
-        "\u2502  /api key <K>       设置Key        \u2502",
-        "\u2502  /api url <U>       设置地址       \u2502",
-        "\u2502  /api model <M>     设置模型       \u2502",
+        "\u2502  /help              Show help      \u2502",
+        "\u2502  /exit              Exit program   \u2502",
+        "\u2502  /reset             Reset chat     \u2502",
+        "\u2502  /clear             Clear chat     \u2502",
+        "\u2502  /version           Show version   \u2502",
+        "\u2502  /status            Current status \u2502",
+        "\u2502  /ctx               Context usage  \u2502",
+        "\u2502  /tools             List tools     \u2502",
+        "\u2502  /tools_more        All tools      \u2502",
+        "\u2502  /tool_search <q>   Search tools   \u2502",
+        "\u2502  /tool_list_saved   List saved tools \u2502",
+        "\u2502  /tool_save <name>  Save tool      \u2502",
+        "\u2502  /tool_del <name>   Delete tool    \u2502",
+        "\u2502  /temp <0-2>        Set temp       \u2502",
+        "\u2502  /token <n>         Set max tokens \u2502",
+        "\u2502  /memory            Memory stats   \u2502",
+        "\u2502  /memory_list [n]   List memories  \u2502",
+        "\u2502  /memory_search <q> Search memory  \u2502",
+        "\u2502  /memory_del <id>   Delete memory  \u2502",
+        "\u2502  /memory_clear      Clear memory   \u2502",
+        "\u2502  /compress          Compress ctx   \u2502",
+        "\u2502  /history [n]       Recent history \u2502",
+        "\u2502  /history files     History files  \u2502",
+        "\u2502  /history search <q>Search history \u2502",
+        "\u2502  /history read <f>  Read history   \u2502",
+        "\u2502  /sessions [n]      List sessions  \u2502",
+        "\u2502  /session <id>      View session   \u2502",
+        "\u2502  /session_search <q>Search sessions\u2502",
+        "\u2502  /trusted           Trusted tools  \u2502",
+        "\u2502  /trust <name>      Trust tool     \u2502",
+        "\u2502  /untrust <name>    Untrust tool   \u2502",
+        "\u2502  /sp_server         Sapni API status  \u2502",
+        "\u2502  /sp_server start   Start Sapni API   \u2502",
+        "\u2502  /sp_server stop    Stop Sapni API    \u2502",
+        "\u2502  /sp_token [desc]   Create Sapni token\u2502",
+        "\u2502  /sp_tokens         List Sapni tokens \u2502",
+        "\u2502  /sp_token_del <id> Delete Sapni token\u2502",
+        "\u2502  /llm               View LLM config   \u2502",
+        "\u2502  /llm key/url/model Set LLM settings  \u2502",
         "\u2570\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500",
       ].join("\n"));
     }
@@ -525,12 +427,12 @@ function App() {
       endSession(a.sessionId);
       a.reset();
       a.sessionId = startSession();
-      setMsgs([{ role: "system", content: "对话已重置，新 session 已创建。" }]);
+      setMsgs([{ role: "system", content: "Conversation reset, new session created." }]);
       setCtxPct(0);
-      say("对话已重置, 新 session 已创建");
+      say("Conversation reset, new session created");
     }
     else if (cmd === "clear") {
-      setMsgs([{ role: "system", content: "对话已清除。" }]);
+      setMsgs([{ role: "system", content: "Chat cleared." }]);
       setCtxPct(0);
     }
     else if (cmd === "version") {
@@ -544,11 +446,11 @@ function App() {
       const names = Tools.listToolNames();
       say([
         "\u256d\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500",
-        "  模型: " + CONFIG.llm.model + "  温度: " + CONFIG.llm.temperature,
-        "  Tokens: 输入" + usage.prompt + " · 输出" + usage.completion,
-        "  上下文: " + pct + "% (上限 " + a.getMaxContextTokens() + " tokens)",
-        "  记忆: ROM" + (mem.romEntries || mem.entries) + " RAM" + (mem.ramEntries || 0) + " · 历史 " + mem.historyMessages + " 轮",
-        "  工具: " + names.length + " 个 — " + names.slice(0, 8).join(", ") + (names.length > 8 ? " ..." : ""),
+        "  Model: " + CONFIG.llm.model + "  Temp: " + CONFIG.llm.temperature,
+        "  Tokens: Prompt " + usage.prompt + " · Completion " + usage.completion,
+        "  Context: " + pct + "% (Limit " + a.getMaxContextTokens() + " tokens)",
+        "  Memory: ROM" + (mem.romEntries || mem.entries) + " RAM" + (mem.ramEntries || 0) + " · History " + mem.historyMessages + " turns",
+        "  Tools: " + names.length + " tools — " + names.slice(0, 8).join(", ") + (names.length > 8 ? " ..." : ""),
         "\u2570\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500",
       ].join("\n"));
     }
@@ -561,48 +463,48 @@ function App() {
       const empty = barW - filled;
       const bar = "\u2588".repeat(filled) + "\u2500".repeat(empty);
       say([
-        "上下文: [" + bar + "] " + pct + "%",
-        "上限: " + a.getMaxContextTokens() + " tokens",
-        "累计: 输入" + usage.prompt + " · 输出" + usage.completion + " · 合计" + (usage.prompt + usage.completion),
-        ">80% 时可 /compress 压缩或让 AI 调用 forget_conversation",
+        "Context: [" + bar + "] " + pct + "%",
+        "Limit: " + a.getMaxContextTokens() + " tokens",
+        "Total: Prompt " + usage.prompt + " · Completion " + usage.completion + " · Sum " + (usage.prompt + usage.completion),
+        ">80%: Use /compress or let AI call forget_conversation",
       ].join("\n"));
     }
     else if (cmd === "memory") {
       const s = getAgent().memory.stats();
-      say("记忆: ROM" + (s.romEntries || s.entries) + " RAM" + (s.ramEntries || 0) + " · 历史消息 " + s.historyMessages + " 轮");
+      say("Memory: ROM" + (s.romEntries || s.entries) + " RAM" + (s.ramEntries || 0) + " · History " + s.historyMessages + " turns");
     }
     else if (cmd === "memory_list") {
       const n = parseInt(rest) || 20;
       const all = getAgent().memory.getAllEntries().slice(-n);
-      if (!all.length) { say("(无记忆条目)"); return; }
+      if (!all.length) { say("(No memory entries)"); return; }
       say(all.map((e) => {
         const tag = e._type === "ram" ? "[RAM]" : "[ROM]";
         return tag + " #" + e.id + " [" + (e.tags?.join(",") || "-") + "] " + e.text;
       }).join("\n"));
     }
     else if (cmd === "memory_search") {
-      if (!rest) { say("用法: /memory_search <关键词>"); return; }
+      if (!rest) { say("Usage: /memory_search <keyword>"); return; }
       const found = getAgent().memory.searchEntries(rest, 10);
-      if (!found.length) { say("未找到匹配 \"" + rest + "\" 的记忆"); return; }
+      if (!found.length) { say("No memory matching \"" + rest + "\" found"); return; }
       say(found.map((e) => "#" + e.id + " [" + (e.tags?.join(",") || "-") + "] " + e.text).join("\n"));
     }
     else if (cmd === "memory_del") {
       const id = parseInt(rest);
-      if (isNaN(id)) { say("用法: /memory_del <id>"); return; }
+      if (isNaN(id)) { say("Usage: /memory_del <id>"); return; }
       const ok = getAgent().memory.removeEntry(id);
-      say(ok ? "已删除 #" + id : "不存在 #" + id);
+      say(ok ? "Deleted #" + id : "#" + id + " not found");
     }
     else if (cmd === "memory_clear") {
       getAgent().memory.clearAllEntries();
-      say("记忆已全部清空 (ROM+RAM)");
+      say("Memory cleared (ROM+RAM)");
     }
     else if (cmd === "compress") {
       const a = getAgent();
       const compressed = a.memory.compressHistory();
-      if (!compressed) { say("对话太短, 无需压缩"); return; }
+      if (!compressed) { say("Conversation too short, no compression needed"); return; }
       a.memory.clear();
-      a.memory.addRamEntry("手动压缩: " + compressed.slice(0, 180), ["manual-summary"]);
-      say("上下文已压缩, 历史清空, 摘要已存入记忆");
+      a.memory.addRamEntry("Manual compress: " + compressed.slice(0, 180), ["manual-summary"]);
+      say("Context compressed, history cleared, summary saved to memory");
     }
     else if (cmd === "tools") {
       const names = Tools.listToolNames();
@@ -611,43 +513,43 @@ function App() {
         const t = Tools.getTool(n);
         return "  " + n + (t?.description ? " — " + t.description.slice(0, 40) : "");
       });
-      say(lines.join("\n") + "\n\n共 " + base.length + " 个核心工具, " + (names.length - base.length) + " 个扩展工具 (输入 /tools_more 查看全部)");
+      say(lines.join("\n") + "\n\n" + base.length + " core tools, " + (names.length - base.length) + " extended tools (use /tools_more for all)");
     }
     else if (cmd === "tools_more") {
       const names = Tools.listToolNames();
       say(names.map((n) => {
         const t = Tools.getTool(n);
         return "  " + n + (t?.description ? " — " + t.description.slice(0, 60) : "");
-      }).join("\n") + "\n\n共 " + names.length + " 个工具");
+      }).join("\n") + "\n\nTotal " + names.length + " tools");
     }
     else if (cmd === "tool_search") {
-      if (!rest) { say("用法: /tool_search <关键词>"); return; }
+      if (!rest) { say("Usage: /tool_search <keyword>"); return; }
       const found = Tools.searchToolRegistry(rest);
-      if (!found.length) { say("未找到匹配 \"" + rest + "\" 的工具"); return; }
+      if (!found.length) { say("No tools matching \"" + rest + "\" found"); return; }
       say(found.map((t) => t.name + " — " + t.description).join("\n"));
     }
     else if (cmd === "tool_list_saved") {
       const saved = Tools.listCustomTools();
-      if (!saved.length) { say("(无持久化工具)"); return; }
-      say(saved.map((s) => "[" + s.file + "] 导出: " + s.exports.join(", ")).join("\n"));
+      if (!saved.length) { say("(No saved tools)"); return; }
+      say(saved.map((s) => "[" + s.file + "] exports: " + s.exports.join(", ")).join("\n"));
     }
     else if (cmd === "tool_del_saved") {
-      if (!rest) { say("用法: /tool_del_saved <name>"); return; }
+      if (!rest) { say("Usage: /tool_del_saved <name>"); return; }
       const result = Tools.deleteToolFile(rest);
       if (result.startsWith("[OK]")) getAgent().refreshTools();
       say(result);
     }
     else if (cmd === "temp") {
       const n = parseFloat(rest);
-      if (isNaN(n) || n < 0 || n > 2) { say("温度范围 0-2"); return; }
+      if (isNaN(n) || n < 0 || n > 2) { say("Temperature range: 0-2"); return; }
       CONFIG.llm.temperature = n; saveConfig(CONFIG);
-      say("温度已设为 " + n);
+      say("Temperature set to " + n);
     }
     else if (cmd === "token") {
       const n = parseInt(rest, 10);
-      if (isNaN(n) || n < 1 || n > 128000) { say("范围 1-128000"); return; }
+      if (isNaN(n) || n < 1 || n > 128000) { say("Range: 1-128000"); return; }
       CONFIG.llm.maxTokens = n; saveConfig(CONFIG);
-      say("MaxTokens 已设为 " + n);
+      say("MaxTokens set to " + n);
     }
     else if (cmd === "history") {
       const subParts = rest.trim().split(/\s+/);
@@ -655,122 +557,266 @@ function App() {
       const arg = subParts.slice(1).join(" ");
       if (sub === "files") {
         const files = getFileList();
-        if (!files.length) { say("(暂无历史文件)"); return; }
-        say(files.map((f) => f.file + " | " + f.turns + "轮 | " + f.size + "KB | " + f.created.slice(0, 10)).join("\n"));
+        if (!files.length) { say("(No history files)"); return; }
+        say(files.map((f) => f.file + " | " + f.turns + " turns | " + f.size + "KB | " + f.created.slice(0, 10)).join("\n"));
       } else if (sub === "search") {
-        if (!arg) { say("用法: /history search <关键词>"); return; }
+        if (!arg) { say("Usage: /history search <keyword>"); return; }
         const results = searchHistory(arg, 10);
-        if (!results.length) { say("未找到匹配 \"" + arg + "\""); return; }
+        if (!results.length) { say("No matches for \"" + arg + "\""); return; }
         say(results.map((r, i) => (i + 1) + ". [" + r.file + "] " + (r.time?.slice(0, 16) || "?") + "\n  " + r.user.slice(0, 120)).join("\n\n"));
       } else if (sub === "read") {
-        if (!arg) { say("用法: /history read <文件名>"); return; }
+        if (!arg) { say("Usage: /history read <filename>"); return; }
         const turns = loadFileTurns(arg, 10);
-        if (!turns.length) { say("找不到文件 " + arg); return; }
-        say(turns.map((t, i) => (i + 1) + ". [" + (t.time?.slice(0, 16) || "?") + "]\n  问: " + (t.user || "").slice(0, 200) + "\n  答: " + (t.assistant || "").slice(0, 200)).join("\n\n"));
+        if (!turns.length) { say("File not found: " + arg); return; }
+        say(turns.map((t, i) => (i + 1) + ". [" + (t.time?.slice(0, 16) || "?") + "]\n  Q: " + (t.user || "").slice(0, 200) + "\n  A: " + (t.assistant || "").slice(0, 200)).join("\n\n"));
       } else {
         const n = parseInt(sub) || 10;
         const turns = listRecentTurns(n);
-        if (!turns.length) { say("(暂无历史记录)"); return; }
+        if (!turns.length) { say("(No recent history)"); return; }
         say(turns.map((t, i) => (i + 1) + ". [" + (t.time?.slice(0, 16) || "?") + "] " + (t.user || "").slice(0, 120)).join("\n"));
       }
+    }
+    else if (cmd === "sp_server") {
+      import("./api/server.js").then(async (server) => {
+        const subCmd = rest.split(" ")[0];
+        const subRest = rest.split(" ").slice(1).join(" ");
+        
+        if (subCmd === "start") {
+          if (server.isServerRunning()) {
+            say("Sapni API server is already running");
+            return;
+          }
+          const defaultPort = CONFIG.api?.port || 27262;
+          const port = parseInt(subRest) || defaultPort;
+          try {
+            await server.startServer(port);
+            say([
+              "╭──────────────────────────────────────────╮",
+              "│  Sapni API Server Started                │",
+              "╰──────────────────────────────────────────╯",
+              "",
+              "URL: http://localhost:" + port,
+              "",
+              "Endpoints:",
+              "  GET  /api/v1/models          List models",
+              "  GET  /api/v1/models/:id      Get model",
+              "  POST /api/v1/chat/completions Chat",
+              "  GET  /api/v1/tools           List tools",
+              "  POST /api/v1/tools/execute   Execute tool",
+              "",
+              "Token: " + (server.getTokens()[0]?.token || "none"),
+            ].join("\n"));
+          } catch (err) {
+            say("Failed to start server: " + err.message);
+          }
+        }
+        else if (subCmd === "stop") {
+          const stopped = await server.stopServer();
+          say(stopped ? "Sapni API server stopped" : "Server was not running");
+        }
+        else {
+          // Default: show status
+          const running = server.isServerRunning();
+          const tokens = server.getTokens();
+          say([
+            "╭──────────────────────────────────────────╮",
+            "│  Sapni API Server Status                 │",
+            "╰──────────────────────────────────────────╯",
+            "",
+            "Status: " + (running ? "🟢 Running" : "🔴 Stopped"),
+            "Port: " + (CONFIG.api?.port || 27262),
+            "Tokens: " + tokens.length,
+            "",
+            "Commands:",
+            "  /sp_server start [port]  Start server",
+            "  /sp_server stop          Stop server",
+          ].join("\n"));
+        }
+      });
+    }
+    else if (cmd === "sp_token") {
+      import("./api/server.js").then((server) => {
+        const token = server.generateToken(rest || "API Token");
+        say([
+          "╭──────────────────────────────────────╮",
+          "│  New API Token Created               │",
+          "╰──────────────────────────────────────╯",
+          "",
+          "Token:       " + token.token,
+          "ID:          " + token.id,
+          "Description: " + token.description,
+          "Created:     " + token.createdAt.slice(0, 19),
+          "",
+          "Use in Authorization header:",
+          "  Authorization: Bearer " + token.token,
+        ].join("\n"));
+      });
+    }
+    else if (cmd === "sp_tokens") {
+      import("./api/server.js").then((server) => {
+        const tokens = server.getTokens();
+        if (!tokens.length) { 
+          say([
+            "╭──────────────────────────────────────╮",
+            "│  No API Tokens                       │",
+            "╰──────────────────────────────────────╯",
+            "",
+            "Use /sp_token to create one.",
+          ].join("\n"));
+          return;
+        }
+        const lines = tokens.map((t, i) => [
+          "─────────────────────────────────────────",
+          "[" + (i + 1) + "] " + t.token,
+          "    ID: " + t.id,
+          "    Desc: " + t.description,
+          "    Created: " + t.createdAt.slice(0, 19),
+          "    Last Used: " + (t.lastUsed?.slice(0, 19) || "Never"),
+          "    Usage: " + t.usageCount + " times",
+        ].join("\n"));
+        say([
+          "╭──────────────────────────────────────╮",
+          "│  API Tokens (" + tokens.length + ")                  │",
+          "╰──────────────────────────────────────╯",
+          "",
+          ...lines,
+        ].join("\n"));
+      });
+    }
+    else if (cmd === "sp_token_del") {
+      if (!rest) { 
+        say([
+          "╭──────────────────────────────────────╮",
+          "│  Usage: /sp_token_del <token_id>     │",
+          "╰──────────────────────────────────────╯",
+        ].join("\n"));
+        return;
+      }
+      import("./api/server.js").then((server) => {
+        const deleted = server.deleteToken(rest);
+        if (deleted) {
+          say([
+            "╭──────────────────────────────────────╮",
+            "│  Token Deleted                       │",
+            "╰──────────────────────────────────────╯",
+            "",
+            "Token: " + deleted.token,
+          ].join("\n"));
+        } else {
+          say([
+            "╭──────────────────────────────────────╮",
+            "│  Token Not Found                     │",
+            "╰──────────────────────────────────────╯",
+          ].join("\n"));
+        }
+      });
     }
     else if (cmd === "sessions") {
       const n = parseInt(rest) || 20;
       const sessions = listSessions(n);
-      if (!sessions.length) { say("(暂无对话 session)"); return; }
+      if (!sessions.length) { say("(No sessions)"); return; }
       const lines = sessions.map((s, i) => {
         const marker = s.status === "active" ? "\u25cf" : "\u25cb";
         return (i + 1) + ". " + marker + " [" + (s.started || "?").slice(0, 16) + "] " +
-          (s.title || "(无标题)") + " | " + s.turnCount + "轮" +
-          (s.status === "active" ? " \u25c0 当前" : "");
+          (s.title || "(untitled)") + " | " + s.turnCount + " turns" +
+          (s.status === "active" ? " \u25c0 current" : "");
       });
-      say("对话 Sessions (" + sessions.length + "):\n" + lines.join("\n") +
-        "\n\n用 /session <编号> 查看详情, /session_search <关键词> 搜索");
+      say("Sessions (" + sessions.length + "):\n" + lines.join("\n") +
+        "\n\nUse /session <number> to view, /session_search <keyword> to search");
     }
     else if (cmd === "session") {
-      if (!rest) { say("用法: /session <session_id 或列表序号>\n请先用 /sessions 查看列表"); return; }
+      if (!rest) { say("Usage: /session <session_id or list number>\nUse /sessions to see list first"); return; }
       const sessions = listSessions(999);
       let sid = rest.trim();
       if (/^\d+$/.test(sid)) {
         const idx = parseInt(sid) - 1;
-        if (idx < 0 || idx >= sessions.length) { say("序号超出范围 (1-" + sessions.length + ")"); return; }
+        if (idx < 0 || idx >= sessions.length) { say("Number out of range (1-" + sessions.length + ")"); return; }
         sid = sessions[idx].id;
       }
       const session = getSession(sid);
-      if (!session) { say("未找到 session: " + sid); return; }
+      if (!session) { say("Session not found: " + sid); return; }
       const turns = loadSessionTurns(sid, 30);
-      const header = "=== " + (session.title || "(无标题)") + " ===\n" +
-        "ID: " + session.id + "  |  " + (session.started || "?").slice(0, 16) + "  |  " + session.turnCount + "轮\n";
-      if (!turns.length) { say(header + "\n(这个 session 暂无对话轮次)"); return; }
+      const header = "=== " + (session.title || "(untitled)") + " ===\n" +
+        "ID: " + session.id + "  |  " + (session.started || "?").slice(0, 16) + "  |  " + session.turnCount + " turns\n";
+      if (!turns.length) { say(header + "\n(No turns in this session)"); return; }
       const body = turns.map((t, i) => {
         return "[" + (i + 1) + "] " + (t.time || "?").slice(0, 16) + "\n" +
-          "  问: " + (t.user || "").slice(0, 300) + "\n" +
-          "  答: " + (t.assistant || "").slice(0, 300);
+          "  Q: " + (t.user || "").slice(0, 300) + "\n" +
+          "  A: " + (t.assistant || "").slice(0, 300);
       }).join("\n\n");
-      say(header + "\n" + body + "\n\n(共 " + turns.length + " 轮, 显示最近 30 轮)");
+      say(header + "\n" + body + "\n\n(" + turns.length + " turns total, showing last 30)");
     }
     else if (cmd === "session_search") {
-      if (!rest) { say("用法: /session_search <关键词> [数量]\n在整个历史中搜索相关 session"); return; }
+      if (!rest) { say("Usage: /session_search <keyword> [limit]\nSearch all history for sessions"); return; }
       const parts = rest.trim().split(/\s+/);
       const limit = parseInt(parts[parts.length - 1]) || 10;
       const query = isNaN(parseInt(parts[parts.length - 1])) ? rest.trim() : parts.slice(0, -1).join(" ");
       const results = globalSearch(query, limit);
-      if (!results.length) { say("全史搜索未找到 \"" + query + "\""); return; }
+      if (!results.length) { say("No matches for \"" + query + "\" in history"); return; }
       const lines = [];
       for (const [i, r] of results.entries()) {
         lines.push((i + 1) + ". [" + (r.sessionStarted || "?").slice(0, 16) + "] " +
-          r.sessionTitle + " | " + r.matchCount + "处匹配 | 得分" + r.totalScore);
+          r.sessionTitle + " | " + r.matchCount + " matches | score " + r.totalScore);
         for (const m of r.topMatches) {
           lines.push("    · " + (m.user || "").slice(0, 100));
         }
       }
-      say("搜索 \"" + query + "\" — " + results.length + " 个 session:\n" + lines.join("\n") +
-        "\n\n用 /session <编号> 查看详情");
+      say("Search \"" + query + "\" — " + results.length + " sessions:\n" + lines.join("\n") +
+        "\n\nUse /session <number> to view");
     }
     else if (cmd === "trusted") {
       const trusted = CONFIG.tools?.trustedTools || [];
-      if (!trusted.length) { say("(暂无受信任工具)"); return; }
-      say("受信任工具 (" + trusted.length + " 个):\n" + trusted.join("\n"));
+      if (!trusted.length) { say("(No trusted tools)"); return; }
+      say("Trusted tools (" + trusted.length + "):\n" + trusted.join("\n"));
     }
     else if (cmd === "trust") {
-      if (!rest) { say("用法: /trust <工具名>"); return; }
+      if (!rest) { say("Usage: /trust <toolname>"); return; }
       Tools.addTrusted(rest);
       CONFIG.tools.trustedTools = [...new Set([...(CONFIG.tools?.trustedTools || []), rest])];
       saveConfig(CONFIG);
-      say("已永久信任 " + rest);
+      say("Trusted: " + rest);
     }
     else if (cmd === "untrust") {
-      if (!rest) { say("用法: /untrust <工具名>"); return; }
+      if (!rest) { say("Usage: /untrust <toolname>"); return; }
       Tools.removeTrusted(rest);
       CONFIG.tools.trustedTools = (CONFIG.tools?.trustedTools || []).filter((n) => n !== rest);
       saveConfig(CONFIG);
-      say("已取消信任 " + rest);
+      say("Untrusted: " + rest);
     }
-    else if (cmd === "api") {
+    else if (cmd === "llm") {
       const sub = rest.split(/\s+/)[0]?.toLowerCase();
       const val = rest.slice(sub ? sub.length : 0).trim();
       if (sub === "key") {
-        if (!val) { say("用法: /api key <Key>"); return; }
-        if (val.length < 10) { say("Key 太短"); return; }
+        if (!val) { say("Usage: /llm key <API_Key>"); return; }
+        if (val.length < 10) { say("Key too short"); return; }
         CONFIG.llm.apiKey = val; saveConfig(CONFIG);
-        say("API Key 已更新 (" + val.slice(0, 8) + "...)");
+        say("LLM API Key updated (" + val.slice(0, 8) + "...)");
       } else if (sub === "url") {
-        if (!val) { say("用法: /api url <地址>"); return; }
+        if (!val) { say("Usage: /llm url <API_URL>"); return; }
         CONFIG.llm.baseURL = val.replace(/\/+$/, ""); saveConfig(CONFIG);
-        say("API 地址已更新: " + CONFIG.llm.baseURL);
+        say("LLM API URL updated: " + CONFIG.llm.baseURL);
       } else if (sub === "model") {
-        if (!val) { say("用法: /api model <模型名>"); return; }
+        if (!val) { say("Usage: /llm model <model_name>"); return; }
         CONFIG.llm.model = val; saveConfig(CONFIG);
-        say("模型已更新: " + CONFIG.llm.model);
+        say("LLM Model updated: " + CONFIG.llm.model);
       } else {
-        const masked = CONFIG.llm.apiKey ? CONFIG.llm.apiKey.slice(0, 8) + "..." + CONFIG.llm.apiKey.slice(-4) : "(未设置)";
+        const masked = CONFIG.llm.apiKey ? CONFIG.llm.apiKey.slice(0, 8) + "..." + CONFIG.llm.apiKey.slice(-4) : "(not set)";
         say([
-          "API 设置",
-          "  Key:   " + masked,
-          "  URL:   " + CONFIG.llm.baseURL,
-          "  Model: " + CONFIG.llm.model,
-          "  温度:  " + CONFIG.llm.temperature + "  |  MaxTokens: " + (CONFIG.llm.maxTokens || "-"),
-          "  设置: /api key <K>  |  /api url <U>  |  /api model <M>",
+          "╭──────────────────────────────────────────╮",
+          "│  LLM Configuration                       │",
+          "╰──────────────────────────────────────────╯",
+          "",
+          "Provider: " + CONFIG.llm.provider,
+          "API Key:  " + masked,
+          "API URL:  " + CONFIG.llm.baseURL,
+          "Model:    " + CONFIG.llm.model,
+          "Temp:     " + CONFIG.llm.temperature,
+          "MaxTokens:" + (CONFIG.llm.maxTokens || "-"),
+          "",
+          "Commands:",
+          "  /llm key <key>    Set API key",
+          "  /llm url <url>    Set API URL",
+          "  /llm model <name> Set model",
         ].join("\n"));
       }
     }
@@ -778,11 +824,21 @@ function App() {
   }, [thinking, blocked, addMsg, run]);
 
   const slashInput = input.startsWith("/");
-  const slashFiltered = slashInput
-    ? COMMANDS.filter(c => c.cmd.startsWith(input) || input === "/" || c.cmd.includes(input))
-    : [];
-  const slashClamped = Math.max(0, Math.min(slashIdx, slashFiltered.length - 1));
-  slashRef.current = { filtered: slashFiltered, clamped: slashClamped };
+  const deferredInput = useDeferredValue(input);
+  
+  const slashFiltered = useMemo(() => {
+    if (!slashInput) return [];
+    return COMMANDS.filter(c => c.cmd.startsWith(deferredInput) || deferredInput === "/" || c.cmd.includes(deferredInput));
+  }, [slashInput, deferredInput]);
+  
+  const slashClamped = useMemo(() => {
+    return Math.max(0, Math.min(slashIdx, slashFiltered.length - 1));
+  }, [slashIdx, slashFiltered.length]);
+  
+  useEffect(() => {
+    slashRef.current = { filtered: slashFiltered, clamped: slashClamped };
+  }, [slashFiltered, slashClamped]);
+  
   const escRef = useRef(0);
 
   useInput((inputVal, key) => {
@@ -805,23 +861,30 @@ function App() {
     <Box flexDirection="column" paddingLeft={1}>
       {!started ? (
         <Box flexDirection="column" flexShrink={0}>
-          {/* 启动页: LOGO + 欢迎框 */}
-          <Box flexDirection="row">
-            {/* 左边 LOGO */}
-            <Box flexDirection="column" paddingRight={2}>
+          {/* Auto-wrap layout: logo left, info right, wraps on narrow terminals */}
+          <Box 
+            flexDirection="row" 
+            flexWrap="wrap" 
+            alignItems="center"
+            borderStyle="round" 
+            borderColor="cyan"
+            paddingX={2}
+            paddingY={1}
+            bg="#1a1a2e"
+          >
+            <Box flexDirection="column" paddingRight={4}>
               {LOGO_LINES.map((line, i) => (
                 <Text key={i} color="magentaBright">{line}</Text>
               ))}
-              <Text color="green">{CONFIG.llm.model} · {CONFIG.llm.contextWindow || 1048576} tokens</Text>
+              <Text color="green">{CONFIG.llm.model} · {(CONFIG.llm.contextWindow || 1048576).toLocaleString()} tokens</Text>
             </Box>
-            {/* 右边欢迎框 */}
-            <Box borderStyle="round" borderColor="cyan" flexDirection="column" paddingX={2} paddingY={1}>
-              <Text color="magentaBright" bold>Sapni v{VER}</Text>
-              <Text color="magenta" dimColor>Self-Evolving AI · Terminal Agent · Ink</Text>
-              <Text> </Text>
-              <Text dimColor>Terminal-native AI coding assistant</Text>
-              <Text> </Text>
-              <Text dimColor>/ command menu · ↑↓ select · Enter confirm</Text>
+            <Box flexGrow={1} flexShrink={1} flexDirection="column" paddingX={3} minWidth={40}>
+              <Text color="cyanBright" bold>Sapni v{VER}</Text>
+              <Text color="cyan" dimColor>Self-Evolving AI · Terminal Agent · Ink</Text>
+              <Text>{"\n"}</Text>
+              <Text color="white">Terminal-native AI coding assistant</Text>
+              <Text>{"\n"}</Text>
+              <Text color="gray">/ command menu · ↑↓ select · Enter confirm</Text>
             </Box>
           </Box>
           <Box marginTop={1}>
@@ -830,25 +893,42 @@ function App() {
         </Box>
       ) : (
       <Box flexDirection="column" flexGrow={1}>
-      <Box flexDirection="column" flexShrink={0}>
-        {LOGO_LINES.map((line, i) => (
-          <Text key={i} color="magentaBright">{line}</Text>
-        ))}
-        <Box marginTop={1}>
-          <Text color="magenta" dimColor>Self-Evolving AI · Terminal Agent · Ink</Text>
+      {/* Auto-wrap header with modern gradient look */}
+      <Box 
+        flexDirection="row" 
+        flexWrap="wrap" 
+        alignItems="center"
+        paddingX={3}
+        paddingY={2}
+        bg="#0d1117"
+        borderStyle="round"
+        borderColor="#30363d"
+      >
+        <Box flexDirection="column" paddingRight={4} flexShrink={0}>
+          {LOGO_LINES.map((line, i) => (
+            <Text key={i} color="magentaBright">{line}</Text>
+          ))}
+          <Text color="green">{CONFIG.llm.model} · {(CONFIG.llm.contextWindow || 1048576).toLocaleString()} tokens</Text>
         </Box>
-        <Text color="gray" dimColor>{"─".repeat(cols - 2)}</Text>
+        <Box flexGrow={1} flexShrink={1} flexDirection="column" minWidth={30}>
+          <Text color="cyanBright" bold>Sapni v{VER}</Text>
+          <Text color="cyan" dimColor>Self-Evolving AI · Terminal Agent · Ink</Text>
+        </Box>
       </Box>
+      <Box bg="#21262d" paddingY={0}><Text color="#58a6ff">{"─".repeat(cols - 2)}</Text></Box>
 
-      <Box flexDirection="column">
+      {/* Messages area */}
+      <Box flexDirection="column" bg="#0d1117">
         {msgs.map((m, i) => (
-          <Msg key={i} role={m.role} content={m.content} />
+          <Box key={i} marginBottom={2}>
+            <Msg role={m.role} content={m.content} />
+          </Box>
         ))}
-        {streaming ? <Streaming content={streaming} /> : null}
-        {thinking && !streaming ? <Thinking /> : null}
+        {streaming ? <Box marginBottom={2}><Streaming content={streaming} /></Box> : null}
+        {thinking && !streaming ? <Box marginBottom={2}><Thinking text={thinkingText} iteration={thinkingIter} content={thinkingText} /></Box> : null}
         {tools.length > 0 && (
-          <Box flexDirection="column">
-            <Text color="gray" dimColor>{"\u2500\u2500\u2500".repeat(8)}</Text>
+          <Box flexDirection="column" marginBottom={2}>
+            <Box bg="#0f3460" paddingY={0}><Text color="yellow">{"\u2500\u2500\u2500".repeat(Math.floor(cols / 4))}</Text></Box>
             <ToolLog tools={tools} collapsed={toolsCollapsed} />
           </Box>
         )}
@@ -857,77 +937,93 @@ function App() {
       </Box>
       )}
       {slashInput && slashFiltered.length > 0 && (
-        <Box flexDirection="column" paddingLeft={2} marginBottom={0}>
+        <Box 
+          flexDirection="column" 
+          paddingLeft={2} 
+          marginBottom={0}
+          bg="#161b22"
+          borderStyle="round"
+          borderColor="#30363d"
+        >
           {slashFiltered.map((c, i) => {
             const sel = i === slashClamped;
             return (
-              <Box key={c.cmd} paddingLeft={1}>
-                <Text color={sel ? "magenta" : "gray"}>{sel ? "\u25b8 " : "  "}</Text>
-                <Text color={sel ? "magentaBright" : undefined} bold={sel}>{c.cmd}</Text>
-                <Text color="gray">{" \u00b7 " + c.desc}</Text>
+              <Box key={c.cmd} flexDirection="row" paddingLeft={1}>
+                <Text color={sel ? "cyanBright" : "gray"}>{sel ? "▸ " : "  "}</Text>
+                <Text color={sel ? "cyanBright" : "white"} bold={sel}>{c.cmd}</Text>
+                <Text color="gray"> · {c.desc}</Text>
               </Box>
             );
           })}
           <Box paddingLeft={1}>
-            <Text color="gray">  \u2191\u2193 切换 \u00b7 回车 选取</Text>
+            <Text color="cyan" dimColor>  ↑↓ Navigate · Enter Select</Text>
           </Box>
         </Box>
       )}
       <Box flexDirection="column" flexShrink={0}>
-        <Text color="gray" dimColor>{"─".repeat(cols - 2)}</Text>
-        <Box paddingX={1}>
-          <Text dimColor>
-            <Text color="magenta">{mascotFace}</Text> {CONFIG.llm.model}
-            {" │ "}
-            <Text color="magenta">msg</Text> {msgs.length}
-            {" │ "}
-            <Text color={ctxPct > 80 ? "yellow" : ctxPct > 90 ? "red" : "green"}>ctx</Text> {ctxPct}%
-            {" │ "}
-            F1帮助 · Esc清空 · 双击退出
+        <Box bg="#21262d" paddingY={0}><Text color="#58a6ff">{"─".repeat(cols - 2)}</Text></Box>
+        
+        {/* StatusBar - simplified */}
+        <Box bg="#161b22" paddingX={2} paddingY={1}>
+          <Text>
+            <Text color="#f783ac">{mascotFace}</Text>
+            <Text color="#6e7681"> </Text>
+            <Text color="#c9d1d9">{CONFIG.llm.model}</Text>
+            <Text color="#484f58"> · </Text>
+            <Text color="#58a6ff">msg {msgs.length}</Text>
+            <Text color="#484f58"> · </Text>
+            <Text color={ctxPct > 90 ? "#f85149" : ctxPct > 80 ? "#d29922" : "#3fb950"}>ctx {Math.round(ctxPct)}%</Text>
           </Text>
         </Box>
 
         {queue.length > 0 && (
-          <Box paddingX={1} paddingBottom={1}>
-            <Text color="yellow" dimColor>
-              {"│ "}队列: {queue.length} 条待执行
+          <Box bg="#161b22" paddingX={2} paddingBottom={1}>
+            <Text color="#d29922" dimColor>
+{"│ "}Queue: {queue.length} pending
               {queue.slice(0, 3).map((q, i) => (
-                <Text key={i} color="gray">{" · "}{q.slice(0, 30)}{q.length > 30 ? "…" : ""}</Text>
+                <Text key={i} color="#6e7681">{" · "}{q.slice(0, 30)}{q.length > 30 ? "…" : ""}</Text>
               ))}
-              {queue.length > 3 ? <Text color="gray"> ...</Text> : null}
+              {queue.length > 3 ? <Text color="#6e7681"> ...</Text> : null}
             </Text>
           </Box>
         )}
 
-        <Text color="magenta">{"─".repeat(cols - 2)}</Text>
+        <Box bg="#21262d" paddingY={0}><Text color="#f783ac">{"─".repeat(cols - 2)}</Text></Box>
 
         {input.length > 200 && (
-          <Box paddingX={1}>
-            <Text color="gray" dimColor>  [{input.length} chars]</Text>
+          <Box bg="#0d1117" paddingX={2}>
+            <Text color="#6e7681" dimColor>  [{input.length} chars]</Text>
           </Box>
         )}
 
-        <Box paddingY={0} flexDirection="row">
-          <Text color="greenBright" bold>{promptFace}  </Text>
-          <Box flexGrow={1}>
+        {/* Input area with GitHub-style green */}
+        <Box 
+          paddingY={0} 
+          flexDirection="row" 
+          flexWrap="wrap"
+          bg="#0d1117"
+          borderStyle="round"
+          borderColor="#30363d"
+        >
+          <Text color="#3fb950" bold flexShrink={0}>{promptFace} </Text>
+          <Box flexGrow={1} flexShrink={1} minWidth={20}>
             <TextInput
-              value={input.length > 500 ? "…" + input.slice(-300) : input}
-              onChange={v => {
+              value={input.length > 500 ? "…" + input.slice(-499) : input}
+              onChange={(v) => {
                 setSlashIdx(0);
-                
-                if (v.startsWith("…")) {
-                  setInput(input.slice(0, Math.max(0, input.length - 300)) + v.slice(1));
-                } else {
+                if (v.length <= 500) {
                   setInput(v);
+                  setPromptFace(kao.promptFace(v));
                 }
               }}
               onSubmit={handleSubmit}
               placeholder={thinking ? "thinking..." : "> "}
+              placeholderColor="gray"
             />
           </Box>
         </Box>
 
-        <Text color="magenta">{"─".repeat(cols - 2)}</Text>
+        <Box bg="#0f3460" paddingY={0}><Text color="magenta">{"─".repeat(cols - 2)}</Text></Box>
       </Box>
     </Box>
   );

@@ -16,13 +16,13 @@ function buildSystemInfo() {
   const home = os.homedir();
   const cwd = process.cwd();
   return [
-    `系统: ${os.type()} ${os.release()} (${os.arch()})`,
-    `主机: ${os.hostname()}`,
-    `用户主目录: ${home}`,
-    `当前工作目录: ${cwd}`,
-    `终端宽度: ${process.stdout.columns || 80} 列`,
+    `System: ${os.type()} ${os.release()} (${os.arch()})`,
+    `Host: ${os.hostname()}`,
+    `Home: ${home}`,
+    `CWD: ${cwd}`,
+    `Term Width: ${process.stdout.columns || 80} cols`,
     `Node: ${process.version}`,
-    `时间: ${new Date().toISOString()}`,
+    `Time: ${new Date().toISOString()}`,
   ].join(" | ");
 }
 
@@ -83,10 +83,11 @@ class Agent {
     this.callbacks = callbacks;
     this.maxIterations = MAX_ITERATIONS;
     this.systemInfo = buildSystemInfo();
-    this.systemPrompt = `${config.systemPrompt}\n\n[系统环境]\n${this.systemInfo}`;
+    this.systemPrompt = `${config.systemPrompt}\n\n[System Info]\n${this.systemInfo}`;
     this.autoCompressThreshold = config.memory?.autoCompressThreshold || 5000;
-    // 使用模型的实际上下文窗口（从模型名推断），而不是 maxTokens（那是输出限制）
-    this.maxContextTokens = (config.llm?.contextWindow || getContextWindow(config.llm?.model)) * 0.8;
+    // Use actual context window (inferred from model name), not maxTokens (that's output limit)
+    this.actualContextWindow = config.llm?.contextWindow || getContextWindow(config.llm?.model);
+    this.maxContextTokens = this.actualContextWindow * 0.8;
     this._lastToolCalls = [];
 
     // session management
@@ -129,12 +130,12 @@ class Agent {
       case "mem_rom": {
         const tags = args.tags ? args.tags.split(",").map((t) => t.trim()) : [];
         const entry = this.memory.addRomEntry(args.content, tags);
-        return entry ? `[ROM] 已保存 #${entry.id}: ${entry.text}` : "[失败] 内容为空";
+        return entry ? `[ROM] Saved #${entry.id}: ${entry.text}` : "[Failed] Empty content";
       }
       case "mem_ram": {
         const tags = args.tags ? args.tags.split(",").map((t) => t.trim()) : [];
         const entry = this.memory.addRamEntry(args.content, tags);
-        return entry ? `[RAM] 已保存 #${entry.id}: ${entry.text}` : "[失败] 内容为空";
+        return entry ? `[RAM] Saved #${entry.id}: ${entry.text}` : "[Failed] Empty content";
       }
       case "list_memory": {
         const all = this.memory.getAllEntries().slice(-(args.limit || 20));
@@ -142,19 +143,19 @@ class Agent {
       }
       case "delete_memory": {
         const ok = this.memory.removeEntry(args.id);
-        return ok ? `[OK] 已删除 #${args.id}` : `[不存在] #${args.id}`;
+        return ok ? `[OK] Deleted #${args.id}` : `[Not found] #${args.id}`;
       }
       case "compress_context": {
         const compressed = this.memory.compressHistory();
-        if (!compressed) return "[跳过] 对话太短";
+        if (!compressed) return "[Skipped] Conversation too short";
         const summary = await this._summarize(compressed);
         this.memory.addRamEntry(summary, ["auto-summary"]);
         this.memory.clear();
-        return `[OK] 上下文已压缩, 摘要存入记忆: ${summary}`;
+        return `[OK] Context compressed, summary saved: ${summary}`;
       }
       case "agent_self_invoke": {
         if (this.callbacks.onSelfInvoke) return this.callbacks.onSelfInvoke(args.task, args.context);
-        return "[跳过] self_invoke 未配置回调";
+        return "[Skipped] self_invoke callback not configured";
       }
       case "set_timer": {
         const s = Math.max(1, Math.min(args.seconds || 5, 300));
@@ -312,18 +313,38 @@ class Agent {
     let warned95 = false;
     const firstIteration = this._firstRun !== false;
     this._firstRun = false;
+    let lastPct = -1;
 
     const activeTools = Tools.filterToolDeclarations(userMessage);
 
     for (let i = 0; i < this.maxIterations; i++) {
-      if (onContextPct || onThinking) {
+      if (onContextPct) {
         const baseMsgs = this._buildMessages();
         const curEst = estimateMessagesTokens(baseMsgs);
         const pct = Math.min(100, Math.ceil((curEst / this.maxContextTokens) * 100));
-        if (onContextPct) onContextPct(pct);
+        if (pct !== lastPct) {
+          onContextPct(pct);
+          lastPct = pct;
+        }
       }
 
-      if (onThinking) onThinking();
+      // Generate thinking message based on iteration count and context
+      if (onThinking) {
+        const thinkingMessages = [
+          `Analyzing user request...`,
+          `Checking available tools: ${activeTools.length} tools available`,
+          `Evaluating context: ${allMsgs.length} messages`,
+          `Planning response strategy...`,
+          `Preparing to call tools if needed...`,
+          `Reviewing conversation history...`,
+          `Determining next action...`,
+          `Processing information...`,
+          `Synthesizing response...`,
+          `Finalizing answer...`,
+        ];
+        const thinkingMsg = thinkingMessages[i % thinkingMessages.length];
+        onThinking(thinkingMsg, i + 1);
+      }
 
       const result = await this.llm.chatStream(messages, onContent || null, activeTools, signal);
 
@@ -352,9 +373,22 @@ class Agent {
 
           if (onToolCall) onToolCall(fnName, fnArgs, i + 1);
 
+          const toolCheck = this._checkTool(fnName, fnArgs);
+          if (toolCheck.status === "error") {
+            const errorMsg = `[TOOL CHECK FAILED] ${toolCheck.message}`;
+            if (onToolResult) onToolResult(fnName, errorMsg);
+            toolMsgs.push({ role: "tool", tool_call_id: tc.id, name: fnName, content: errorMsg });
+            allMsgs.push({ role: "tool", name: fnName, content: errorMsg });
+            continue;
+          }
+
           let toolResult;
-          try { toolResult = await Tools.executeTool(fnName, fnArgs); }
-          catch (e) { toolResult = `error: ${e.message}`; }
+          try { 
+            toolResult = await Tools.executeTool(fnName, fnArgs); 
+          }
+          catch (e) { 
+            toolResult = `error: ${e.message}`; 
+          }
 
           const capped = String(toolResult).slice(0, MAX_TOOL_RESULT_CHARS);
           if (onToolResult) onToolResult(fnName, capped.slice(0, 300));
@@ -432,7 +466,55 @@ class Agent {
     return Math.min(100, Math.ceil((est / this.maxContextTokens) * 100));
   }
 
-  getMaxContextTokens() { return this.maxContextTokens; }
+  getMaxContextTokens() { return this.actualContextWindow; }
+
+  _checkTool(fnName, fnArgs) {
+    const checks = [];
+    
+    const tool = Tools.getTool(fnName);
+    if (!tool) {
+      return { status: "error", message: `Tool "${fnName}" not found in registry` };
+    }
+    
+    checks.push({ name: "Tool Exists", status: "OK" });
+    
+    if (tool.parameters && Array.isArray(tool.parameters)) {
+      for (const param of tool.parameters) {
+        if (param.required && !(param.name in fnArgs)) {
+          checks.push({ name: `Param ${param.name}`, status: "MISSING", reason: "Required parameter" });
+        }
+      }
+    }
+    
+    const fileTools = ["read", "write", "delete_file", "file_info", "search_replace"];
+    if (fileTools.includes(fnName)) {
+      if (!fnArgs.filePath && !fnArgs.path) {
+        checks.push({ name: "File Path", status: "MISSING", reason: "filePath or path required" });
+      }
+    }
+    
+    const cmdTools = ["exec_console"];
+    if (cmdTools.includes(fnName)) {
+      if (!fnArgs.command) {
+        checks.push({ name: "Command", status: "MISSING", reason: "command required" });
+      }
+    }
+    
+    const failed = checks.filter(c => c.status !== "OK");
+    if (failed.length > 0) {
+      const messages = failed.map(c => `${c.name}: ${c.status}${c.reason ? ` (${c.reason})` : ""}`);
+      return { 
+        status: "error", 
+        message: `Pre-execution check failed:\n${messages.join("\n")}\n\nTool: ${fnName}\nArgs: ${JSON.stringify(fnArgs, null, 2)}`
+      };
+    }
+    
+    const passed = checks.filter(c => c.status === "OK").map(c => c.name).join(", ");
+    return { 
+      status: "ok", 
+      message: `Pre-execution check passed: ${passed}` 
+    };
+  }
 }
 
 module.exports = Agent;

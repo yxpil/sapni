@@ -65,7 +65,9 @@ const moveFileTool = {
     source: { type: "string", required: true, description: "源路径" },
     target: { type: "string", required: true, description: "目标路径" },
   },
-  execute: async ({ source, target }) => {
+  execute: async (params) => {
+    const source = params.source || params.filePath;
+    const target = params.target;
     if (!fs.existsSync(source)) return `[不存在] ${source}`;
     const targetDir = path.dirname(target);
     if (!fs.existsSync(targetDir)) fs.mkdirSync(targetDir, { recursive: true });
@@ -82,7 +84,9 @@ const copyFileTool = {
     source: { type: "string", required: true, description: "源文件路径" },
     target: { type: "string", required: true, description: "目标路径" },
   },
-  execute: async ({ source, target }) => {
+  execute: async (params) => {
+    const source = params.source || params.filePath;
+    const target = params.target;
     if (!fs.existsSync(source)) return `[不存在] ${source}`;
     const targetDir = path.dirname(target);
     if (!fs.existsSync(targetDir)) fs.mkdirSync(targetDir, { recursive: true });
@@ -136,15 +140,23 @@ const searchInFilesTool = {
     if (!fs.existsSync(dirPath)) return `[不存在] ${dirPath}`;
     const max = maxResults || 50;
     const ic = ignoreCase !== false;
-    try {
-      const cmd = `grep -rn ${ic ? "-i" : ""} --include="${fileGlob || "*"}" -m ${max} "${pattern.replace(/"/g, '\\"')}" "${dirPath}"`;
-      const output = execSync(cmd, { cwd: dirPath, encoding: "utf-8", timeout: 10000, maxBuffer: 1024 * 1024 });
-      const lines = output.trim().split("\n").slice(0, max);
-      return lines.length > 0 ? lines.join("\n") : `[无匹配] "${pattern}" 在 ${dirPath}`;
-    } catch (e) {
-      if (e.stdout) return e.stdout.trim().split("\n").slice(0, max).join("\n");
-      return `[无匹配] "${pattern}" 在 ${dirPath}`;
+    const results = [];
+    const searchRe = new RegExp(pattern, ic ? "gi" : "g");
+    function walk(dir) {
+      if (results.length >= max) return;
+      let entries; try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch(e) { return; }
+      for (const e of entries) {
+        if (results.length >= max) break;
+        const fp = path.join(dir, e.name);
+        if (e.isDirectory()) { if (e.name !== "node_modules" && e.name !== ".git" && !e.name.startsWith(".")) walk(fp); }
+        else if (e.isFile()) {
+          if (fileGlob && fileGlob !== "*") { const gre = new RegExp("" + fileGlob.replace(/\./g, "\\.").replace(/\*/g, ".*").replace(/\?/g, ".") + "$"); if (!gre.test(e.name)) continue; }
+          try { const content = fs.readFileSync(fp, "utf8"); const flines = content.split("\n"); for (let i = 0; i < flines.length; i++) { if (searchRe.test(flines[i])) { results.push(fp + ":" + (i+1) + ":" + flines[i].trim()); searchRe.lastIndex = 0; if (results.length >= max) break; } } } catch(err) {}
+        }
+      }
     }
+    walk(dirPath);
+    return results.length > 0 ? results.join("\n") : `[无匹配] "${pattern}" 在 ${dirPath}`;
   },
 };
 
@@ -158,15 +170,21 @@ const findFilesTool = {
   },
   execute: async ({ pattern, dirPath, maxResults }) => {
     if (!fs.existsSync(dirPath)) return `[不存在] ${dirPath}`;
-    const max = maxResults || 100;
-    try {
-      const cmd = `find "${dirPath}" -name "${pattern}" -not -path '*/node_modules/*' -not -path '*/.git/*' | head -n ${max}`;
-      const output = execSync(cmd, { encoding: "utf-8", timeout: 5000, maxBuffer: 1024 * 1024 });
-      return output.trim() || `[无匹配] ${pattern} 在 ${dirPath}`;
-    } catch (e) {
-      if (e.stdout) return e.stdout.trim() || `[无匹配] ${pattern}`;
-      return `[无匹配] ${pattern} 在 ${dirPath}`;
+    const max = maxResults || 50;
+    const results = [];
+    const nameRe = pattern ? new RegExp("" + pattern.replace(/\./g, "\\.").replace(/\*/g, ".*").replace(/\?/g, ".") + "$") : null;
+    function walk(dir) {
+      if (results.length >= max) return;
+      let entries; try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch(e) { return; }
+      for (const e of entries) {
+        if (results.length >= max) break;
+        const fp = path.join(dir, e.name);
+        if (e.isDirectory()) { if (e.name !== "node_modules" && e.name !== ".git") walk(fp); }
+        else if (e.isFile()) { if (!nameRe || nameRe.test(e.name)) results.push(fp); }
+      }
     }
+    walk(dirPath);
+    return results.length > 0 ? results.join("\n") : `[无匹配] ${pattern || "*"} 在 ${dirPath}`;
   },
 };
 

@@ -20,7 +20,7 @@ const todoWriteTool = {
   },
   execute: async ({ todos }) => {
     try {
-      const list = JSON.parse(todos);
+      const list = typeof todos === "string" ? JSON.parse(todos) : (Array.isArray(todos) ? todos : JSON.parse(JSON.stringify(todos)));
       if (!Array.isArray(list)) return "[失败] todos 必须是数组";
       if (list.length > 10) return `[警告] 最多10项, 收到${list.length}项`;
       const counts = { pending: 0, in_progress: 0, completed: 0 };
@@ -201,7 +201,11 @@ const grepTool = {
 
     // 优先使用 ripgrep (更快, 支持 --json + 上下文)
     const rgPath = (() => {
-      try { return execSync("which rg", { encoding: "utf-8", timeout: 2000 }).trim(); }
+      try { 
+        // 跨平台检测命令
+        const cmd = process.platform === "win32" ? "where rg" : "which rg";
+        return execSync(cmd, { encoding: "utf-8", timeout: 2000 }).trim(); 
+      }
       catch (_) { return null; }
     })();
 
@@ -267,7 +271,7 @@ const grepTool = {
       }
     }
 
-    // 回退: 系统 grep
+    // 回退: 系统 grep (Linux/macOS)
     const globFilter = glob ? ` --include="${glob}"` : "";
     const icFlag = ic ? " -i" : "";
     const ctxFlag = context && context > 0 ? ` -C ${context}` : "";
@@ -277,10 +281,60 @@ const grepTool = {
       const lines = output.trim().split("\n").slice(0, mode === "count" ? 9999 : max);
       if (lines.length === 0 || (lines.length === 1 && !lines[0])) return `[无匹配] "${pattern}" 在 ${root}`;
       return lines.join("\n");
-    } catch (e) {
-      if (e.stdout) return e.stdout.trim().split("\n").slice(0, max).join("\n");
-      return `[无匹配] "${pattern}" 在 ${root}`;
+    } catch (_e) {
+      // 系统 grep 不可用 → 纯 JS 回退
     }
+
+    // 纯 Node.js 回退 (Windows / 无grep环境)
+    const results = [];
+    let matchCount = 0;
+    const walkJS = (dir) => {
+      let entries;
+      try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch (_) { return; }
+      for (const entry of entries) {
+        if (shouldIgnore(entry.name)) continue;
+        const fp = path.join(dir, entry.name);
+        if (entry.isDirectory()) { walkJS(fp); continue; }
+        if (glob) {
+          const re = globToRegex(glob);
+          if (!re.test(entry.name)) continue;
+        }
+        try {
+          const content = fs.readFileSync(fp, "utf-8");
+          const lines = content.split("\n");
+          for (let i = 0; i < lines.length; i++) {
+            try {
+              const re = ic ? new RegExp(pattern, "i") : new RegExp(pattern);
+              if (!re.test(lines[i])) continue;
+              if (mode === "files_with_matches") {
+                results.push(fp);
+                break;
+              }
+              if (mode === "count") {
+                matchCount++;
+              } else {
+                if (context > 0) {
+                  const st = Math.max(0, i - context);
+                  const en = Math.min(lines.length, i + context + 1);
+                  for (let j = st; j < en; j++) {
+                    results.push(`${fp}:${j + 1}:${lines[j]}`);
+                  }
+                  results.push("--");
+                } else {
+                  results.push(`${fp}:${i + 1}:${lines[i]}`);
+                }
+              }
+              if (results.length >= max) break;
+            } catch (_) {}
+          }
+          if (results.length >= max) break;
+        } catch (_) {}
+      }
+    };
+    walkJS(root);
+    if (mode === "files_with_matches") return [...new Set(results)].join("\n") || `[无匹配] "${pattern}" 在 ${root}`;
+    if (mode === "count") return String(matchCount);
+    return results.slice(0, max).join("\n") || `[无匹配] "${pattern}" 在 ${root}`;
   },
 };
 
@@ -514,13 +568,16 @@ const getDiagnosticsTool = {
     const cwd = process.cwd();
     const results = [];
     try {
-      const out = execSync("npx tsc --noEmit 2>&1 || echo ''", { cwd, encoding: "utf-8", timeout: 30000, maxBuffer: 512 * 1024 });
+      // 跨平台命令：Windows 使用 cmd /c，避免 bash 语法
+      const cmdTsc = process.platform === "win32" ? "cmd /c npx tsc --noEmit 2>&1" : "npx tsc --noEmit 2>&1";
+      const out = execSync(cmdTsc, { cwd, encoding: "utf-8", timeout: 30000, maxBuffer: 512 * 1024 });
       const errors = out.trim().split("\n").filter((l) => l.includes("error TS"));
       if (errors.length > 0) results.push(`[TypeScript] ${errors.length} 个错误`);
       results.push(...errors.slice(0, 20));
     } catch (_) {}
     try {
-      const out = execSync("npx eslint . --format compact 2>&1 || echo ''", { cwd, encoding: "utf-8", timeout: 30000, maxBuffer: 512 * 1024 });
+      const cmdEslint = process.platform === "win32" ? "cmd /c npx eslint . --format compact 2>&1" : "npx eslint . --format compact 2>&1";
+      const out = execSync(cmdEslint, { cwd, encoding: "utf-8", timeout: 30000, maxBuffer: 512 * 1024 });
       const warns = out.trim().split("\n").filter((l) => l.includes("warning") || l.includes("error"));
       if (warns.length > 0) results.push(`[ESLint] ${warns.length} 个问题`);
       results.push(...warns.slice(0, 10));

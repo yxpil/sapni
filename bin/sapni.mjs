@@ -6,7 +6,15 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const __filename = fileURLToPath(import.meta.url);
 const tsxPath = path.join(__dirname, "..", "node_modules", "tsx", "dist", "esm", "index.mjs");
-const entryPath = path.join(__dirname, "..", "Src", "index.jsx");
+
+// Check for -server or --server flag
+const isServerMode = process.argv.includes("-server") || process.argv.includes("--server") || 
+                     process.argv.includes("-s");
+
+// Determine entry path based on mode
+const entryPath = isServerMode 
+  ? path.join(__dirname, "..", "Src", "cli.js")
+  : path.join(__dirname, "..", "Src", "index.jsx");
 
 // Node 24+: register() is broken, re-exec with --import
 // --import requires file:// URL on Windows (Node 24 ESM restriction)

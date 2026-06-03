@@ -203,7 +203,7 @@ _rebuildKeywords();
  * @returns {Array} 匹配的工具 function_declarations 数组
  */
 function filterToolDeclarations(prompt) {
-  if (!prompt || prompt.trim().length === 0) {
+  if (!prompt || typeof prompt !== "string" || prompt.trim().length === 0) {
     return toFunctionDeclarations();
   }
 

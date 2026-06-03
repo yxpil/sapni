@@ -98,9 +98,10 @@ const webFetchTool = {
         const sc = res.statusCode;
         const ms = Date.now() - start;
         if (sc >= 300 && sc < 400 && res.headers.location) {
-          resolve({ ok: false, msg: `[HTTP ${sc} 重定向 | ${ms}ms] -> ${res.headers.location}` });
-          return;
-        }
+            // 自动跟随重定向(最多3次)
+            resolve({ redirect: res.headers.location.startsWith("http") ? res.headers.location : new (require("url").URL)(res.headers.location, url).href });
+            return;
+          }
         if (sc === 404) { resolve({ ok: false, msg: `[HTTP 404 Not Found | ${ms}ms]` }); return; }
         if (sc === 403) { resolve({ ok: false, msg: `[HTTP 403 Forbidden | ${ms}ms]` }); return; }
         if (sc >= 500) { resolve({ ok: false, msg: `[HTTP ${sc} Server Error | ${ms}ms]` }); return; }

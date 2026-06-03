@@ -71,6 +71,7 @@ class Agent {
       "save_tool", "delete_tool_file", "list_saved_tools",
       "forget_conversation", "restart_session",
       "search_history", "list_history_files",
+      "list_sessions", "view_session", "search_sessions",
     ];
     for (const name of memTools) {
       const tool = Tools.getTool(name);
@@ -167,6 +168,15 @@ class Agent {
         const files = getFileList();
         if (files.length === 0) return "(暂无历史对话文件)";
         return files.map((f) => `${f.file} | ${f.turns}轮 | ${f.size}KB | ${f.created.slice(0, 10)}`).join("\n");
+      }
+      case "list_sessions": {
+        return viewListSessions(args.limit || 20);
+      }
+      case "view_session": {
+        return viewSession(args.session_id, args.limit || 50);
+      }
+      case "search_sessions": {
+        return viewSearchSessions(args.query, args.limit || 10);
       }
       default:
         return `[未知内部工具] ${name}`;

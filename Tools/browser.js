@@ -7,16 +7,31 @@ let _chromePath = null;
 function _getChromePath() {
   if (_chromePath) return _chromePath;
   const candidates = [
-    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-    "/Applications/Chromium.app/Contents/MacOS/Chromium",
+    // Windows
     "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
     "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
+    "C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe",
+    "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
+    // macOS
+    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+    "/Applications/Chromium.app/Contents/MacOS/Chromium",
+    "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+    // Linux
     "/usr/bin/google-chrome",
     "/usr/bin/chromium-browser",
     "/usr/bin/chromium",
-  ];
+    "/usr/bin/msedge",
+    // Windows (其他常见位置)
+    process.env.LOCALAPPDATA + "\\Google\\Chrome\\Application\\chrome.exe",
+    process.env.PROGRAMDATA + "\\Microsoft\\Windows\\Start Menu\\Programs\\Google Chrome.lnk",
+  ].filter(Boolean);
+  
   for (const c of candidates) {
-    if (fs.existsSync(c)) { _chromePath = c; return c; }
+    if (fs.existsSync(c)) { 
+      _chromePath = c; 
+      console.log(`[browser] Found browser at: ${c}`);
+      return c; 
+    }
   }
   return null;
 }
@@ -110,7 +125,12 @@ const browsePageTool = {
       return result;
     } catch (e) {
       if (page) await page.close().catch(() => {});
-      return `[浏览器失败 ${Date.now() - start}ms] ${e.message}`;
+      const errMsg = e.message || String(e);
+      let hint = "";
+      if (errMsg.includes("Chrome") || errMsg.includes("Chromium") || errMsg.includes("Edge") || errMsg.includes("未找到")) {
+        hint = "\n[提示] 可使用 web_fetch 工具代替: 它使用 HTTP 直接获取网页内容";
+      }
+      return `[浏览器失败 ${Date.now() - start}ms] ${errMsg}${hint}`;
     }
   },
 };
