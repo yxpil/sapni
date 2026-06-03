@@ -272,6 +272,16 @@ const compressContextTool = {
   execute: () => { return "compress_context must be injected"; },
 };
 
+const truncateContextTool = {
+  name: "truncate_context",
+  description: "截断旧对话: 提取关键词保留上下文, 删除旧消息释放 token 空间. 比 compress_context 快(无需 AI 总结)",
+  parameters: {
+    keywords: { type: "string", required: false, description: "提取的关键词, 注入作为上下文提示" },
+    keep: { type: "number", required: false, description: "保留最近几条消息 (默认 10)" },
+  },
+  execute: () => { return "truncate_context must be injected"; },
+};
+
 const agentSelfInvokeTool = {
   name: "agent_self_invoke",
   description: "Agent自我递归调用: 将子任务交给另一个Sapni实例处理并返回结果",
@@ -328,6 +338,7 @@ module.exports = {
   view_session: viewSessionTool,
   search_sessions: searchSessionsTool,
   compress_context: compressContextTool,
+  truncate_context: truncateContextTool,
   agent_self_invoke: agentSelfInvokeTool,
   save_tool: saveToolTool,
   delete_tool_file: deleteToolFileTool,

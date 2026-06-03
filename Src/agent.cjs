@@ -112,7 +112,7 @@ class Agent {
     const memTools = [
       "search_memory", "save_memory", "list_memory", "delete_memory",
       "mem_rom", "mem_ram",
-      "compress_context", "agent_self_invoke", "set_timer",
+      "compress_context", "truncate_context", "agent_self_invoke", "set_timer",
       "save_tool", "delete_tool_file", "list_saved_tools",
       "forget_conversation", "restart_session",
       "search_history", "list_history_files",
@@ -155,6 +155,23 @@ class Agent {
         this.memory.addRamEntry(summary, ["auto-summary"]);
         this.memory.clear();
         return `[OK] Context compressed, summary saved: ${summary}`;
+      }
+      case "truncate_context": {
+        const keywords = args.keywords || "";
+        const keep = Math.max(0, parseInt(args.keep) || 10);
+        const history = this.memory.getHistory();
+        if (history.length <= keep) return `[Skipped] Only ${history.length} messages, no need to truncate`;
+        const recent = history.slice(-keep);
+        this.memory.clear();
+        // Inject keywords as system context
+        if (keywords) {
+          this.memory.addRamEntry(`[对话关键词 / Keywords] ${keywords}`, ["keywords"]);
+        }
+        // Restore recent messages
+        for (const msg of recent) {
+          this.memory.history.push(msg);
+        }
+        return `[OK] 已截断上下文: 保留最近 ${keep} 条消息, 关键词已注入. 原有 ${history.length} 条 → 现有 ${this.memory.getHistory().length} 条`;
       }
       case "agent_self_invoke": {
         if (this.callbacks.onSelfInvoke) return this.callbacks.onSelfInvoke(args.task, args.context);
