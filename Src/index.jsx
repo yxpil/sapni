@@ -12,7 +12,7 @@ const require = createRequire(import.meta.url);
 const { fileURLToPath } = require("url");
 
 const Tools = require("../Tools");
-const presets = require("./presets");
+const presets = require("./presets.cjs");
 const { listRecentTurns, searchHistory, getFileList, loadFileTurns, listSessions, getSession, loadSessionTurns, globalSearch, endSession, startSession } = require("../Mem/history");
 const kao = require("../Tools/kaomoji");
 import { ToolLog, Msg, Thinking, Streaming, StatusBar } from "./components";

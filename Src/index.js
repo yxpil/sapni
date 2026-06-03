@@ -4,7 +4,7 @@ const readline = require("readline");
 const { spawn } = require("child_process");
 const Agent = require("./agent");
 const Tools = require("../Tools");
-const presets = require("./presets");
+const presets = require("./presets.cjs");
 const { listRecentTurns, searchHistory, getFileList, loadFileTurns, listSessions, getSession, loadSessionTurns, globalSearch, endSession, startSession } = require("../Mem/history");
 
 const C = {
@@ -572,7 +572,7 @@ async function handleSlashCommand(input) {
     case "provider":
     case "preset": {
       const choice = parseInt(rest, 10);
-      const presetsList = require("./presets");
+      const presetsList = require("./presets.cjs");
 
       // No arg or invalid: show provider list
       if (!choice || choice < 1 || choice > presetsList.PRESETS.length) {
