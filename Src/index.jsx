@@ -197,6 +197,8 @@ const COMMANDS = [
   { cmd: "/session", desc: "View session" },
   { cmd: "/session_search", desc: "Search sessions" },
   { cmd: "/provider", desc: "Switch AI provider (one-click)" },
+  { cmd: "/persona", desc: "Set AI identity/persona" },
+  { cmd: "/persona reset", desc: "Reset identity to default" },
   { cmd: "/trusted", desc: "Trusted tools" },
   { cmd: "/trust", desc: "Trust tool" },
   { cmd: "/untrust", desc: "Untrust tool" },
@@ -805,6 +807,22 @@ function App() {
       if (result.error) { say(result.error); return; }
       saveConfig(CONFIG);
       say("✓ Switched to " + p.name + "\n  Model: " + CONFIG.llm.model + "\n  URL: " + CONFIG.llm.baseURL + "\n  Temp: " + CONFIG.llm.temperature + "  TopP: " + CONFIG.llm.topP + "\n\nNext: /llm key <your_API_key>");
+    }
+    else if (cmd === "persona" || cmd === "identity") {
+      const text = rest.trim();
+      if (!text) {
+        if (CONFIG.persona) {
+          say("Current identity:\n" + CONFIG.persona + "\n\n/persona reset — reset to default\n/persona <text> — set new identity");
+        } else {
+          say("No custom identity set (using default system prompt)\nUsage: /persona <description>");
+        }
+      } else if (text === "reset" || text === "default") {
+        delete CONFIG.persona; saveConfig(CONFIG);
+        say("✓ Identity reset to default");
+      } else {
+        CONFIG.persona = text; saveConfig(CONFIG);
+        say("✓ Identity updated:\n" + text);
+      }
     }
     else if (cmd === "llm") {
       const sub = rest.split(/\s+/)[0]?.toLowerCase();

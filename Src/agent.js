@@ -49,6 +49,9 @@ class Agent {
     this.maxIterations = MAX_ITERATIONS;
     this.systemInfo = buildSystemInfo();
     this.systemPrompt = `${config.systemPrompt}\n\n[系统环境]\n${this.systemInfo}`;
+    if (config.persona) {
+      this.systemPrompt = `[身份设定] ${config.persona}\n\n${this.systemPrompt}`;
+    }
     this.autoCompressThreshold = config.memory?.autoCompressThreshold || 5000;
     this.maxContextTokens = (config.llm?.maxTokens || 65536) * 0.75;
     this._lastToolCalls = [];

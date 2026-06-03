@@ -84,6 +84,9 @@ class Agent {
     this.maxIterations = MAX_ITERATIONS;
     this.systemInfo = buildSystemInfo();
     this.systemPrompt = `${config.systemPrompt}\n\n[System Info]\n${this.systemInfo}`;
+    if (config.persona) {
+      this.systemPrompt = `[Identity] ${config.persona}\n\n${this.systemPrompt}`;
+    }
     this.autoCompressThreshold = config.memory?.autoCompressThreshold || 5000;
     // Use actual context window (inferred from model name), not maxTokens (that's output limit)
     this.actualContextWindow = config.llm?.contextWindow || getContextWindow(config.llm?.model);

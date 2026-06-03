@@ -342,6 +342,8 @@ function showHelp() {
     ["/tools_more", "查看全部工具(含扩展)"],
     ["/temp <0-2>", "设置温度"], ["/topp <0-1>", "设置 TopP"], ["/token <n>", "设置最大输出token"],
     ["/provider", "一键切换 AI 提供商"],
+    ["/persona <描述>", "设置 AI 身份/性格"],
+    ["/persona reset", "重置身份为默认"],
     ["/memory", "查看记忆统计"], ["/memory_list [n]", "列出记忆条目"],
     ["/memory_search <q>", "搜索记忆"], ["/memory_del <id>", "删除记忆"],
     ["/memory_clear", "清空所有记忆"], ["/compress", "手动压缩上下文"],
@@ -534,6 +536,37 @@ async function handleSlashCommand(input) {
     }
     case "version": {
       console.log(`${C.bold + C.cyan}${config.agent.name}${C.reset} v${config.agent.version}`);
+      break;
+    }
+    case "persona":
+    case "identity": {
+      const text = rest.trim();
+      if (!text) {
+        if (config.persona) {
+          console.log(div());
+          console.log(`  当前身份设定:`);
+          console.log(`  ${C.cyan}${config.persona}${C.reset}`);
+          console.log(div());
+          console.log(`  ${C.dim}/persona reset${C.reset} 重置为默认`);
+          console.log(`  ${C.dim}/persona <新身份>${C.reset} 修改身份设定`);
+        } else {
+          console.log(`${C.dim}当前无身份设定（使用默认系统提示）${C.reset}`);
+          console.log(`用法: /persona <身份描述>  — 例如: /persona 你是一个猫娘助手`);
+        }
+        break;
+      }
+      if (text === "reset" || text === "default") {
+        delete config.persona;
+        saveConfig();
+        buildAgent();
+        console.log(`${C.green}✓${C.reset} 身份设定已重置为默认`);
+        break;
+      }
+      config.persona = text;
+      saveConfig();
+      buildAgent();
+      console.log(`${C.green}✓${C.reset} 身份设定已更新:`);
+      console.log(`  ${C.cyan}${text}${C.reset}`);
       break;
     }
     case "provider":
