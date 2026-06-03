@@ -224,7 +224,7 @@ function typeset(text) {
       out.push("");
       continue;
     }
-    out.push("  " + wordWrap(line, w - 2));
+    out.push("  " + "\x1b[38;5;248m" + wordWrap(line, w - 2) + C.reset);
   }
   flushCode();
   flushTable();
@@ -260,7 +260,7 @@ function inlineTypeset(line) {
   l = l.replace(/~~(.+?)~~/g, C.dim + C.red + "$1" + C.reset);
   l = l.replace(/\[([^\]]+)\]\(([^)]+)\)/g, C.cyan + "$1" + C.reset + C.dim + " ($2)" + C.reset);
   if (!l.trim()) return "";
-  return "  " + l;
+  return "  " + "\x1b[38;5;248m" + l + C.reset;
 }
 
 function ctxBar(pct) {
@@ -889,7 +889,7 @@ async function runUserInput(input) {
     if (thinkTimer) return;
     thinkFrame = 0;
     thinkTimer = setInterval(() => {
-      process.stdout.write(`\r\x1b[0K${C.cyan}${THINK_FRAMES[thinkFrame % THINK_FRAMES.length]}${C.reset} ${C.dim}思考中…${C.reset}`);
+      process.stdout.write(`\r\x1b[0K${C.cyan}${THINK_FRAMES[thinkFrame % THINK_FRAMES.length]}${C.reset} ${C.yellow}思考中…${C.reset}`);
       thinkFrame++;
     }, 120);
   }
@@ -945,7 +945,7 @@ async function runUserInput(input) {
       },
       onToolResult: (name, preview) => {
         stopThinking();
-        process.stdout.write(`  ${C.dim}${C.green}✓${C.reset} ${name}\n`);
+        process.stdout.write(`  ${C.green}✓${C.reset} ${C.cyan}${name}${C.reset}\n`);
         startThinking();
       },
     });

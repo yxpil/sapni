@@ -24,19 +24,19 @@ const ToolLogItem = React.memo(function ToolLogItem({ tool }) {
           ? <Text color="green">✓</Text>
           : <Text color="yellow"><Spinner type="dots" /></Text>}
         <Text color="magenta" bold>{tool.name}</Text>
-        {tool.status !== "done" && <Text color="gray" dimColor>(running...)</Text>}
+        {tool.status !== "done" && <Text color="yellow">(工作中…)</Text>}
       </Box>
       
       {tool.args && (
         <Box paddingLeft={2} marginTop={0.5}>
-          <Text color="cyan" dimColor>[Args]</Text>
-          <Text color="gray"> {tool.args}</Text>
+          <Text color="cyan" dimColor>[参数]</Text>
+          <Text color="#8b949e"> {tool.args}</Text>
         </Box>
       )}
       
       {tool.result && (
         <Box paddingLeft={2} marginTop={0.5} borderStyle="round" borderColor="gray" paddingX={2} paddingY={1}>
-          <Text color="cyan" dimColor>[Result]</Text>
+          <Text color="cyan" dimColor>[结果]</Text>
           <Box marginTop={0.5}>
             {(() => {
               const lines = tool.result.split("\n").filter(l => l.trim());
@@ -55,7 +55,7 @@ const ToolLogItem = React.memo(function ToolLogItem({ tool }) {
                       </Text>
                     );
                   }).slice(0, 8)}
-                  {lines.length > 8 && <Text color="gray" dimColor>... (+{lines.length - 8} lines)</Text>}
+                  {lines.length > 8 && <Text color="#8b949e" dimColor>... (+{lines.length - 8} lines)</Text>}
                 </Box>
               );
             })()}
@@ -76,8 +76,8 @@ const ToolLog = React.memo(function ToolLog({ tools, collapsed }) {
     return (
       <Box flexDirection="column" borderStyle="round" borderColor="gray" paddingX={2} paddingY={1}>
         <Box flexDirection="row" justifyContent="space-between">
-          <Text color="gray" dimColor>Tool Calls</Text>
-          <Text color="gray" dimColor>{completedCount}/{tools.length}</Text>
+          <Text color="#8b949e" dimColor>Tool Calls</Text>
+          <Text color="#8b949e" dimColor>{completedCount}/{tools.length}</Text>
         </Box>
         <Box flexDirection="column" marginTop={1} gap={0.5}>
           {tools.map((t, i) => (
@@ -87,7 +87,7 @@ const ToolLog = React.memo(function ToolLog({ tools, collapsed }) {
                 : <Text color="yellow"><Spinner type="dots" /></Text>}
               <Text color="magenta">{t.name}</Text>
               {runningCount === 0 && (
-                <Text color="gray" dimColor>- {t.result?.length > 50 ? t.result.slice(0, 50) + "..." : t.result}</Text>
+                <Text color="#8b949e" dimColor>- {t.result?.length > 50 ? t.result.slice(0, 50) + "..." : t.result}</Text>
               )}
             </Box>
           ))}
@@ -99,8 +99,8 @@ const ToolLog = React.memo(function ToolLog({ tools, collapsed }) {
   return (
     <Box flexDirection="column" borderStyle="round" borderColor="gray" paddingX={2} paddingY={1}>
       <Box flexDirection="row" justifyContent="space-between" marginBottom={1}>
-        <Text color="gray" dimColor>{"─".repeat(10)} Tool Calls ({tools.length})</Text>
-        <Text color="gray" dimColor>{completedCount} done{runningCount > 0 ? `, ${runningCount} running` : ""}</Text>
+        <Text color="#8b949e" dimColor>{"─".repeat(10)} 工具调用 ({tools.length})</Text>
+                <Text color="#8b949e" dimColor>{completedCount} 完成{runningCount > 0 ? `, {runningCount} 执行中` : ""}</Text>
       </Box>
       <Box flexDirection="column" gap={1}>
         {tools.map((t, i) => (

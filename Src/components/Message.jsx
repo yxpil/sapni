@@ -33,7 +33,7 @@ const Msg = React.memo(function Msg({ role, content }) {
       <Box flexDirection="row" gap={2}>
         <Text color={info.color}>{info.emoji}</Text>
         <Text color={info.color} bold>{info.label}</Text>
-        <Text color="gray" dimColor>- {lines.length} lines</Text>
+        <Text color="#8b949e" dimColor>- {lines.length} 行</Text>
       </Box>
       
       <Box marginTop={1} borderStyle="round" borderColor="gray" paddingX={2} paddingY={1}>
