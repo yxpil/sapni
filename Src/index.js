@@ -339,7 +339,7 @@ function showHelp() {
     ["/help", "显示此帮助"], ["/exit", "退出程序"], ["/reset", "重置当前对话"],
     ["/tools", "列出所有工具"], ["/tool_search <q>", "搜索工具"],
     ["/tools_more", "查看全部工具(含扩展)"],
-    ["/temp <0-2>", "设置温度"], ["/token <n>", "设置最大输出token"],
+    ["/temp <0-2>", "设置温度"], ["/topp <0-1>", "设置 TopP"], ["/token <n>", "设置最大输出token"],
     ["/memory", "查看记忆统计"], ["/memory_list [n]", "列出记忆条目"],
     ["/memory_search <q>", "搜索记忆"], ["/memory_del <id>", "删除记忆"],
     ["/memory_clear", "清空所有记忆"], ["/compress", "手动压缩上下文"],
@@ -502,16 +502,31 @@ async function handleSlashCommand(input) {
         saveConfig();
         buildAgent();
         console.log(`${C.green}模型已更新: ${config.llm.model}${C.reset}`);
+      } else if (sub === "topp") {
+        const v = parseFloat(val);
+        if (isNaN(v) || v < 0 || v > 1) { console.log(`用法: /api topp <0-1>\n  例: /api topp 0.95`); break; }
+        config.llm.topP = v;
+        saveConfig();
+        buildAgent();
+        console.log(`${C.green}TopP 已设为 ${v}${C.reset}`);
+      } else if (sub === "provider") {
+        if (!val) { console.log(`用法: /api provider <名称>\n  例: /api provider moonshot`); break; }
+        config.llm.provider = val;
+        saveConfig();
+        console.log(`${C.green}Provider 已设为 ${val}${C.reset}`);
       } else {
         const masked = config.llm.apiKey ? `${config.llm.apiKey.slice(0, 8)}...${config.llm.apiKey.slice(-4)}` : "(未设置)";
         console.log(div());
         console.log(`  ${C.bold}API 设置${C.reset}`);
+        console.log(`  提供商:  ${C.cyan}${config.llm.provider}${C.reset}`);
         console.log(`  Key:     ${C.dim}${masked}${C.reset}`);
         console.log(`  URL:     ${C.cyan}${config.llm.baseURL}${C.reset}`);
         console.log(`  Model:   ${C.bold}${config.llm.model}${C.reset}`);
-        console.log(`  温度:    ${config.llm.temperature}  |  MaxTokens: ${config.llm.maxTokens}`);
+        console.log(`  温度:    ${config.llm.temperature}  |  TopP: ${config.llm.topP}  |  MaxTokens: ${config.llm.maxTokens}`);
+        console.log(`  上下文:  ${(config.llm.contextWindow || 0).toLocaleString()} tokens`);
         console.log(div());
         console.log(`  设置: /api key <KEY>  |  /api url <URL>  |  /api model <MODEL>`);
+        console.log(`        /api topp <0-1>  |  /api provider <名称>`);
       }
       break;
     }
@@ -535,6 +550,15 @@ async function handleSlashCommand(input) {
       saveConfig();
       buildAgent();
       console.log(`${C.green}温度已设为 ${v}${C.reset}`);
+      break;
+    }
+    case "topp": {
+      const v = parseFloat(rest);
+      if (isNaN(v) || v < 0 || v > 1) { console.log(`TopP 范围 0-1`); break; }
+      config.llm.topP = v;
+      saveConfig();
+      buildAgent();
+      console.log(`${C.green}TopP 已设为 ${v}${C.reset}`);
       break;
     }
     case "token": {
