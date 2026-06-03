@@ -7,7 +7,7 @@ const Thinking = React.memo(function Thinking({ text, iteration, content }) {
     <Box flexDirection="column" borderStyle="round" borderColor="magenta" paddingX={2} paddingY={1}>
       <Box flexDirection="row" gap={2}>
         <Text color="magenta"><Spinner type="dots" /></Text>
-        <Text color="magenta" bold>Thinking</Text>
+        <Text color="magenta" bold>思考中 / Thinking</Text>
         {iteration > 1 && (
           <Text color="gray" dimColor>Iteration {iteration}</Text>
         )}
