@@ -25,7 +25,7 @@ const SAPNI_CONFIG = path.join(SAPNI_DIR, "config.json");
 const PKG_CONFIG = path.join(__dirname, "..", "config.json");
 const LOGO_PATH = path.join(__dirname, "..", "Logos", "StartLogo.txt");
 
-const VER = "1.1.4";
+const VER = "1.1.4-rc1";
 
 function ensureDir() { if (!fs.existsSync(SAPNI_DIR)) fs.mkdirSync(SAPNI_DIR, { recursive: true }); }
 function loadConfig() {
@@ -35,7 +35,19 @@ function loadConfig() {
   fs.writeFileSync(SAPNI_CONFIG, JSON.stringify(cfg, null, 2), "utf-8");
   return cfg;
 }
-function saveConfig(cfg) { ensureDir(); fs.writeFileSync(SAPNI_CONFIG, JSON.stringify(cfg, null, 2), "utf-8"); }
+function saveConfig(cfg) {
+  ensureDir();
+  fs.writeFileSync(SAPNI_CONFIG, JSON.stringify(cfg, null, 2), "utf-8");
+  // 自动重载 LLM 配置，无需重启
+  if (_agent && _agent.llm) {
+    _agent.llm.reloadConfig(cfg.llm);
+    // 同步上下文窗口估算
+    if (cfg.llm?.contextWindow) {
+      _agent.actualContextWindow = cfg.llm.contextWindow;
+      _agent.maxContextTokens = cfg.llm.contextWindow * 0.8;
+    }
+  }
+}
 
 const CONFIG = loadConfig();
 

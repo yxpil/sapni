@@ -24,6 +24,16 @@ class LLMClient {
     this.totalCompletionTokens = 0;
   }
 
+  reloadConfig(config) {
+    this.apiKey = config.apiKey;
+    this.baseURL = config.baseURL.endsWith('/') ? config.baseURL : config.baseURL + '/';
+    this.model = config.model;
+    this.maxTokens = config.maxTokens;
+    this.temperature = config.temperature;
+    this.topP = config.topP;
+    this.contextWindow = config.contextWindow;
+  }
+
   async chat(messages, tools = null, signal = null) {
     const body = {
       model: this.model,
