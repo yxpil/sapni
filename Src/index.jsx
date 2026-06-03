@@ -25,7 +25,7 @@ const SAPNI_CONFIG = path.join(SAPNI_DIR, "config.json");
 const PKG_CONFIG = path.join(__dirname, "..", "config.json");
 const LOGO_PATH = path.join(__dirname, "..", "Logos", "StartLogo.txt");
 
-const VER = "1.1.4-rc1";
+const VER = "1.1.4-rc2";
 
 function ensureDir() { if (!fs.existsSync(SAPNI_DIR)) fs.mkdirSync(SAPNI_DIR, { recursive: true }); }
 function loadConfig() {
@@ -168,7 +168,12 @@ let _agent = null;
 function getAgent() {
   if (_agent) return _agent;
   const Agent = require("./agent.cjs");
-  _agent = new Agent(CONFIG, { onPermission: () => true });
+  _agent = new Agent(CONFIG, {
+    onPermission: (name, args) => {
+      const trusted = CONFIG.tools?.trustedTools || [];
+      return trusted.includes(name);
+    },
+  });
   return _agent;
 }
 
