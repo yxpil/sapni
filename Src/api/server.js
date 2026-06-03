@@ -9,7 +9,7 @@ import os from "os";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const USER_CONFIG_FILE = join(os.homedir(), ".sapni", "config.json");
 const PKG_CONFIG_FILE = join(__dirname, "..", "..", "config.json");
-const TOKENS_FILE = join(__dirname, "..", "..", "api_tokens.json");
+const TOKENS_FILE = join(os.homedir(), ".sapni", "api_tokens.json");
 
 // Load configuration: prefer user config (~/.sapni/config.json), fallback to package config
 function loadConfig() {
