@@ -25,7 +25,7 @@ const SAPNI_CONFIG = path.join(SAPNI_DIR, "config.json");
 const PKG_CONFIG = path.join(__dirname, "..", "config.json");
 const LOGO_PATH = path.join(__dirname, "..", "Logos", "StartLogo.txt");
 
-const VER = "1.1.2";
+const VER = "1.1.3-rc4";
 
 function ensureDir() { if (!fs.existsSync(SAPNI_DIR)) fs.mkdirSync(SAPNI_DIR, { recursive: true }); }
 function loadConfig() {
@@ -196,9 +196,11 @@ const COMMANDS = [
   { cmd: "/sessions", desc: "列出会话 / List sessions" },
   { cmd: "/session", desc: "查看会话 / View session" },
   { cmd: "/session_search", desc: "搜索会话 / Search sessions" },
-  { cmd: "/provider", desc: "一键切换 AI 提供商 / Switch provider" },
-  { cmd: "/persona", desc: "设置 AI 身份/性格 / Set persona" },
+  { cmd: "/provider", desc: "一键切换 AI 提供商（自动导入推荐值）/ Switch provider" },
+  { cmd: "/persona", desc: "查看当前身份 / View persona" },
   { cmd: "/persona reset", desc: "重置身份为默认 / Reset persona" },
+  { cmd: "/persona show", desc: "显示当前身份 / Show persona" },
+  { cmd: "/persona off", desc: "关闭自定义身份, 使用默认提示 / Disable persona" },
   { cmd: "/trusted", desc: "受信任工具 / Trusted tools" },
   { cmd: "/trust", desc: "信任工具 / Trust tool" },
   { cmd: "/untrust", desc: "取消信任 / Untrust" },
@@ -224,8 +226,10 @@ function App() {
   const [slashIdx, setSlashIdx] = useState(0);
   const [mascotFace, setMascotFace] = useState(kao.mascotForFrame());
   const [promptFace, setPromptFace] = useState(kao.promptFace(""));
-  const [queue, setQueue] = useState([]);
+  const queueRef = useRef([]);
+  const [queueLen, setQueueLen] = useState(0);
   const abortRef = useRef(null);
+  const blockedRef = useRef(false);
 
 
   const [msgs, setMsgs] = useState([]);
@@ -257,7 +261,8 @@ function App() {
   }, []);
 
   const run = useCallback(async (query) => {
-    if (blocked) return;
+    if (blockedRef.current) return;
+    blockedRef.current = true;
     setBlocked(true);
     setThinking(true);
     setStreaming("");
@@ -319,6 +324,9 @@ function App() {
       } else {
         addMsg("system", "✗ " + e.message);
       }
+      // Make sure blocked is cleared on error/abort
+      blockedRef.current = false;
+      setBlocked(false);
     }
 
     if (buf) addMsg("assistant", formatMd(buf, cols - 4));
@@ -328,22 +336,20 @@ function App() {
     abortRef.current = null;
     
 
-    // 处理队列中的下一条
-    setQueue(prev => {
-      if (prev.length <= 1) {
-        setBlocked(false);
-        return [];
-      }
-      // delay next to allow React to update
-      const [done, ...rest] = prev;
+    blockedRef.current = false;
+    setBlocked(false);
+    // Process next in queue
+    const q = queueRef.current;
+    if (q.length > 0) {
+      const [next, ...rest] = q;
+      queueRef.current = rest;
+      setQueueLen(rest.length);
       setTimeout(() => {
-        const next = rest[0];
         addMsg("user", next);
         run(next);
       }, 50);
-      return rest;
-    });
-  }, [blocked, addMsg, cols]);
+    }
+  }, [addMsg, cols]);
 
   const slashRef = useRef({ filtered: [], clamped: 0 });
 
@@ -361,11 +367,12 @@ function App() {
     }
 
     // 如果正在执行中，加入队列而非阻塞
-    if (blocked || thinking) {
-      if (v === "/reset" || v === "/clear" || v === "/exit" || v === "/help" || v === "/version" || v === "/status" || v === "/ctx") {
-        // 这些命令仍可直接执行（不阻塞）
+    if (blockedRef.current || thinking) {
+      if (v.startsWith("/") || v.startsWith("／")) {
+        // 所有斜杠命令不阻塞，直接执行
       } else {
-        setQueue(prev => [...prev, v]);
+        queueRef.current = [...queueRef.current, v];
+        setQueueLen(queueRef.current.length);
         setInput("");
         return;
       }
@@ -407,7 +414,7 @@ function App() {
         "\u2502  /history       \u5386\u53f2 / History            \u2502",
         "\u2502  /sessions      \u4f1a\u8bdd / Sessions           \u2502",
         "\u2502  /session       \u67e5\u770b / View               \u2502",
-        "\u2502  /provider      \u5207\u6362\u63d0\u4f9b\u5546 / Provider \u2502",
+        "\u2502  /provider      \u5207\u6362\u63d0\u4f9b\u5546 / Provider         \u2502",
         "\u2502  /persona       \u8eab\u4efd\u8bbe\u5b9a / Persona   \u2502",
         "\u2502  /llm           LLM \u914d\u7f6e / LLM config      \u2502",
         "\u2502  /sp_server     API \u670d\u52a1 / Server          \u2502",
@@ -544,6 +551,12 @@ function App() {
       if (isNaN(n) || n < 1 || n > 128000) { say("范围: 1-128000 / Range: 1-128000"); return; }
       CONFIG.llm.maxTokens = n; saveConfig(CONFIG);
       say("MaxTokens 已设为 / Set to " + n);
+    }
+    else if (cmd === "topp") {
+      const n = parseFloat(rest);
+      if (isNaN(n) || n < 0 || n > 1) { say("TopP 范围: 0-1 / Range: 0-1"); return; }
+      CONFIG.llm.topP = n; saveConfig(CONFIG);
+      say("TopP 已设为 / Set to " + n);
     }
     else if (cmd === "history") {
       const subParts = rest.trim().split(/\s+/);
@@ -778,38 +791,98 @@ function App() {
       say("已取消信任 / Untrusted: " + rest);
     }
     else if (cmd === "provider" || cmd === "preset") {
-      const choice = parseInt(rest, 10);
+      const choice = parseInt(rest.trim(), 10);
+      
+      // 无参数: 显示提供商列表
       if (!choice || choice < 1 || choice > presets.PRESETS.length) {
-        say("== 选择 AI 提供商 / Select Provider ==\n" + presets.formatProviderMenu() + "\n\nUsage: /provider <number>");
+        say([
+          "╭──────────────────────────────────────────╮",
+          "│  AI 提供商 / AI Provider                  │",
+          "╰──────────────────────────────────────────╯",
+          "",
+          presets.PRESETS.map((p, i) => {
+            return [
+              `  ${String(i + 1).padEnd(3)} ${p.name}`,
+              `        ${p.note}`,
+              `        默认: ${p.defaultModel || p.models[0].id} · Temp ${p.temperature} · TopP ${p.topP}`,
+            ].join("\n");
+          }).join("\n\n"),
+          "",
+          "用法: /provider <编号>",
+          "示例: /provider 3     → 一键切换到 OpenAI (gpt-4o-mini)",
+        ].join("\n"));
         return;
       }
+
       const idx = choice - 1;
       const p = presets.PRESETS[idx];
-      if (p.models.length > 1) {
-        say(p.name + " — 选择模型 / Select model:\n" + presets.formatModelMenu(idx) + "\n\n用法: /provider " + choice + " <model_number>");
-        return;
-      }
-      const modelChoice = rest.trim().split(/\s+/).length > 1
-        ? parseInt(rest.trim().split(/\s+/)[1], 10) - 1 : 0;
-      const result = presets.applyPreset(CONFIG, idx, Math.max(0, modelChoice));
+      // 自动选择默认模型 (第一个)
+      const result = presets.applyPreset(CONFIG, idx, 0);
       if (result.error) { say(result.error); return; }
       saveConfig(CONFIG);
-      say("✓ 已切换到 / Switched to " + p.name + "\n  Model: " + CONFIG.llm.model + "\n  URL: " + CONFIG.llm.baseURL + "\n  Temp: " + CONFIG.llm.temperature + "  TopP: " + CONFIG.llm.topP + "\n\n下一步: /llm key <你的API Key>");
+      say([
+        "╭──────────────────────────────────────────╮",
+        `│  ✓ 已切换 / Switched                      │`,
+        "╰──────────────────────────────────────────╯",
+        "",
+        `  提供商: ${p.name}`,
+        `  模型:   ${CONFIG.llm.model}`,
+        `  URL:    ${CONFIG.llm.baseURL}`,
+        `  Temp:   ${CONFIG.llm.temperature}`,
+        `  TopP:   ${CONFIG.llm.topP}`,
+        `  上下文: ${(CONFIG.llm.contextWindow || 0).toLocaleString()} tokens`,
+        "",
+        "下一步: /llm key <你的API Key>",
+        "换模型: /llm model <模型名>",
+      ].join("\n"));
     }
     else if (cmd === "persona" || cmd === "identity") {
-      const text = rest.trim();
-      if (!text) {
+      const raw = rest.trim();
+      const text = raw.toLowerCase();
+      if (!raw || raw === "show") {
         if (CONFIG.persona) {
-          say("当前身份:\n" + CONFIG.persona + "\n\n/persona reset — 恢复默认\n/persona <描述> — 设置新身份");
+          say([
+            "╭──────────────────────────────────────────╮",
+            "│  当前身份 / Current Persona               │",
+            "╰──────────────────────────────────────────╯",
+            "",
+            "  " + CONFIG.persona,
+            "",
+            "子命令 / Subcommands:",
+            "  /persona <描述>    设置新身份 / Set persona",
+            "  /persona show      查看当前 / Show",
+            "  /persona reset     恢复默认 / Reset",
+            "  /persona off       关闭身份 / Disable",
+          ].join("\n"));
         } else {
-          say("无自定义身份(默认系统提示) / No custom identity\n用法: /persona <描述>");
+          say([
+            "╭──────────────────────────────────────────╮",
+            "│  无自定义身份 / No Custom Persona         │",
+            "╰──────────────────────────────────────────╯",
+            "",
+            "  当前使用默认系统提示。",
+            "",
+            "子命令 / Subcommands:",
+            "  /persona 你是一个...  设置身份 / Set persona",
+            "  /persona reset        恢复默认 / Reset",
+          ].join("\n"));
         }
-      } else if (text === "reset" || text === "default") {
+      } else if (text === "reset" || text === "default" || text === "off") {
         delete CONFIG.persona; saveConfig(CONFIG);
-        say("✓ 身份已重置为默认 / Identity reset");
+        say([
+          "╭──────────────────────────────────────────╮",
+          "│  ✓ 身份已重置为默认 / Identity reset      │",
+          "╰──────────────────────────────────────────╯",
+        ].join("\n"));
       } else {
-        CONFIG.persona = text; saveConfig(CONFIG);
-        say("✓ 身份已更新 / Identity updated:\n" + text);
+        CONFIG.persona = raw; saveConfig(CONFIG);
+        say([
+          "╭──────────────────────────────────────────╮",
+          "│  ✓ 身份已更新 / Identity updated          │",
+          "╰──────────────────────────────────────────╯",
+          "",
+          "  " + raw,
+        ].join("\n"));
       }
     }
     else if (cmd === "llm") {
@@ -840,6 +913,7 @@ function App() {
           "API URL:  " + CONFIG.llm.baseURL,
           "Model:    " + CONFIG.llm.model,
           "Temp:     " + CONFIG.llm.temperature,
+          "TopP:     " + (CONFIG.llm.topP || "-"),
           "MaxTokens:" + (CONFIG.llm.maxTokens || "-"),
           "",
           "Commands:",
@@ -850,7 +924,7 @@ function App() {
       }
     }
     else { run(v); }
-  }, [thinking, blocked, addMsg, run]);
+  }, [addMsg, run]);
 
   const slashInput = input.startsWith("/");
   const deferredInput = useDeferredValue(input);
@@ -867,20 +941,19 @@ function App() {
   useEffect(() => {
     slashRef.current = { filtered: slashFiltered, clamped: slashClamped };
   }, [slashFiltered, slashClamped]);
-  
-  const escRef = useRef(0);
 
   useInput((inputVal, key) => {
     if (key.escape) {
-      if (abortRef.current) { abortRef.current.abort(); return; }
+      // ESC: 中断AI → 清空输入 → 无操作（不移除退出功能）
+      if (abortRef.current) {
+        abortRef.current.abort();
+        queueRef.current = []; // 清空队列
+        setQueueLen(0);
+        return;
+      }
       if (input.length > 0) { setInput(""); return; }
-      // 双击 Esc 退出
-      const now = Date.now();
-      if (now - escRef.current < 500) { process.exit(0); }
-      escRef.current = now;
       return;
     }
-    escRef.current = 0;
     if (!slashInput || !slashFiltered.length) return;
     if (key.upArrow) setSlashIdx((slashClamped - 1 + slashFiltered.length) % slashFiltered.length);
     if (key.downArrow || key.tab) setSlashIdx((slashClamped + 1) % slashFiltered.length);
@@ -1005,14 +1078,14 @@ function App() {
           </Text>
         </Box>
 
-        {queue.length > 0 && (
+        {queueLen > 0 && (
           <Box bg="#161b22" paddingX={2} paddingBottom={1}>
             <Text color="#d29922" dimColor>
-{"│ "}Queue: {queue.length} pending
-              {queue.slice(0, 3).map((q, i) => (
+{"│ "}Queue: {queueLen} pending
+              {queueRef.current.slice(0, 3).map((q, i) => (
                 <Text key={i} color="#6e7681">{" · "}{q.slice(0, 30)}{q.length > 30 ? "…" : ""}</Text>
               ))}
-              {queue.length > 3 ? <Text color="#6e7681"> ...</Text> : null}
+              {queueLen > 3 ? <Text color="#6e7681"> ...</Text> : null}
             </Text>
           </Box>
         )}

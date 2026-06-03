@@ -274,7 +274,7 @@ class Agent {
         { role: "system", content: "将以下对话压缩为一条200字以内的中文摘要,只输出摘要。" },
         { role: "user", content: text.slice(0, 4000) },
       ];
-      const res = await this.llm.chat(msgs, null, signal);
+      const res = await this.llm.chat(msgs, null);
       return (res.choices?.[0]?.message?.content || text.slice(0, 190)).slice(0, 190);
     } catch (_) {
       return text.slice(0, 190);

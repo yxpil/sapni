@@ -590,27 +590,35 @@ const skillTool = {
   name: "skill",
   description: "执行一个技能模块: 从 Skills/ 目录加载预定义的技能脚本. 技能定义了完成特定任务的方法论和步骤, 调用后会注入上下文指导后续操作",
   parameters: {
-    name: { type: "string", required: true, description: "技能名, 如 'code_review' / 'refactor' / 'test_gen'" },
+    name: { type: "string", required: true, description: "技能名, 如 'code_review' / 'refactor' / 'verify_execution'" },
   },
   execute: async ({ name }) => {
-    const skillDir = path.join(process.cwd(), "Skills");
-    if (!fs.existsSync(skillDir)) return `[无技能目录] ${skillDir} 不存在, 请创建 Skills/ 目录并放入 .cjs 或 .js 脚本`;
+    // 搜索顺序: CWD Skills > 包内置 Skills
+    const cwdSkills = path.join(process.cwd(), "Skills");
+    const pkgSkills = path.join(__dirname, "..", "Skills");
+    const searchDirs = [];
+    if (fs.existsSync(cwdSkills)) searchDirs.push(cwdSkills);
+    if (fs.existsSync(pkgSkills) && pkgSkills !== cwdSkills) searchDirs.push(pkgSkills);
+    
+    if (searchDirs.length === 0) return `[无技能目录] 未找到 Skills/ 目录 (检查了 ${cwdSkills} 和 ${pkgSkills})`;
 
-    // 先尝试 .cjs (兼容 ESM package.json), 再尝试 .js
-    let skillPath = path.join(skillDir, name + ".cjs");
+    let skillPath = null;
     let ext = ".cjs";
-    if (!fs.existsSync(skillPath)) {
-      skillPath = path.join(skillDir, name + ".js");
-      ext = ".js";
+    for (const dir of searchDirs) {
+      const candidate = path.join(dir, name + ".cjs");
+      if (fs.existsSync(candidate)) { skillPath = candidate; break; }
+      const candidateJs = path.join(dir, name + ".js");
+      if (fs.existsSync(candidateJs)) { skillPath = candidateJs; ext = ".js"; break; }
     }
-    if (!fs.existsSync(skillPath)) {
+    
+    if (!skillPath) {
       const available = [];
-      if (fs.existsSync(skillDir)) {
-        fs.readdirSync(skillDir)
+      for (const dir of searchDirs) {
+        fs.readdirSync(dir)
           .filter((f) => f.endsWith(".cjs") || f.endsWith(".js"))
           .forEach((f) => available.push(f.replace(/\.(cjs|js)$/, "")));
       }
-      return `[无此技能] ${name}\n可用技能: ${available.length > 0 ? [...new Set(available)].join(", ") : "(空)"}`;
+      return `[无此技能] ${name}\n可用技能: ${[...new Set(available)].length > 0 ? [...new Set(available)].join(", ") : "(空)"}`;
     }
     try {
       const mod = require(skillPath);
