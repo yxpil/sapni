@@ -1,7 +1,7 @@
 {
   "agent": {
     "name": "Sapni",
-    "version": "1.1.0-rc6",
+    "version": "1.1.1",
     "description": "栖梦 — 自进化AI编程助手"
   },
   "llm": {

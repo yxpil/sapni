@@ -12,6 +12,7 @@ const require = createRequire(import.meta.url);
 const { fileURLToPath } = require("url");
 
 const Tools = require("../Tools");
+const presets = require("./presets");
 const { listRecentTurns, searchHistory, getFileList, loadFileTurns, listSessions, getSession, loadSessionTurns, globalSearch, endSession, startSession } = require("../Mem/history");
 const kao = require("../Tools/kaomoji");
 import { ToolLog, Msg, Thinking, Streaming, StatusBar } from "./components";
@@ -195,6 +196,7 @@ const COMMANDS = [
   { cmd: "/sessions", desc: "List sessions" },
   { cmd: "/session", desc: "View session" },
   { cmd: "/session_search", desc: "Search sessions" },
+  { cmd: "/provider", desc: "Switch AI provider (one-click)" },
   { cmd: "/trusted", desc: "Trusted tools" },
   { cmd: "/trust", desc: "Trust tool" },
   { cmd: "/untrust", desc: "Untrust tool" },
@@ -784,6 +786,25 @@ function App() {
       CONFIG.tools.trustedTools = (CONFIG.tools?.trustedTools || []).filter((n) => n !== rest);
       saveConfig(CONFIG);
       say("Untrusted: " + rest);
+    }
+    else if (cmd === "provider" || cmd === "preset") {
+      const choice = parseInt(rest, 10);
+      if (!choice || choice < 1 || choice > presets.PRESETS.length) {
+        say("== Select AI Provider ==\n" + presets.formatProviderMenu() + "\n\nUsage: /provider <number>");
+        return;
+      }
+      const idx = choice - 1;
+      const p = presets.PRESETS[idx];
+      if (p.models.length > 1) {
+        say(p.name + " — Select model:\n" + presets.formatModelMenu(idx) + "\n\nUsage: /provider " + choice + " <model_number>");
+        return;
+      }
+      const modelChoice = rest.trim().split(/\s+/).length > 1
+        ? parseInt(rest.trim().split(/\s+/)[1], 10) - 1 : 0;
+      const result = presets.applyPreset(CONFIG, idx, Math.max(0, modelChoice));
+      if (result.error) { say(result.error); return; }
+      saveConfig(CONFIG);
+      say("✓ Switched to " + p.name + "\n  Model: " + CONFIG.llm.model + "\n  URL: " + CONFIG.llm.baseURL + "\n  Temp: " + CONFIG.llm.temperature + "  TopP: " + CONFIG.llm.topP + "\n\nNext: /llm key <your_API_key>");
     }
     else if (cmd === "llm") {
       const sub = rest.split(/\s+/)[0]?.toLowerCase();

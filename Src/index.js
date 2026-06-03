@@ -4,6 +4,7 @@ const readline = require("readline");
 const { spawn } = require("child_process");
 const Agent = require("./agent");
 const Tools = require("../Tools");
+const presets = require("./presets");
 const { listRecentTurns, searchHistory, getFileList, loadFileTurns, listSessions, getSession, loadSessionTurns, globalSearch, endSession, startSession } = require("../Mem/history");
 
 const C = {
@@ -340,6 +341,7 @@ function showHelp() {
     ["/tools", "列出所有工具"], ["/tool_search <q>", "搜索工具"],
     ["/tools_more", "查看全部工具(含扩展)"],
     ["/temp <0-2>", "设置温度"], ["/topp <0-1>", "设置 TopP"], ["/token <n>", "设置最大输出token"],
+    ["/provider", "一键切换 AI 提供商"],
     ["/memory", "查看记忆统计"], ["/memory_list [n]", "列出记忆条目"],
     ["/memory_search <q>", "搜索记忆"], ["/memory_del <id>", "删除记忆"],
     ["/memory_clear", "清空所有记忆"], ["/compress", "手动压缩上下文"],
@@ -532,6 +534,59 @@ async function handleSlashCommand(input) {
     }
     case "version": {
       console.log(`${C.bold + C.cyan}${config.agent.name}${C.reset} v${config.agent.version}`);
+      break;
+    }
+    case "provider":
+    case "preset": {
+      const choice = parseInt(rest, 10);
+      const presetsList = require("./presets");
+
+      // No arg or invalid: show provider list
+      if (!choice || choice < 1 || choice > presetsList.PRESETS.length) {
+        console.log(div("="));
+        console.log(C.bold + C.cyan + "  选择 AI 提供商" + C.reset);
+        console.log(div("="));
+        console.log(presetsList.formatProviderMenu());
+        console.log(div());
+        console.log(`用法: /provider <编号>`);
+        break;
+      }
+
+      const idx = choice - 1;
+      const p = presetsList.PRESETS[idx];
+
+      // Show model options
+      if (p.models.length > 1) {
+        console.log(div("="));
+        console.log(`  ${C.bold + C.cyan}${p.name}${C.reset} — 选择模型`);
+        console.log(div("="));
+        console.log(presetsList.formatModelMenu(idx));
+        console.log(div());
+        console.log(`用法: /provider ${choice} <模型编号>`);
+        break;
+      }
+
+      // Single model or model specified
+      const modelChoice = rest.trim().split(/\s+/).length > 1
+        ? parseInt(rest.trim().split(/\s+/)[1], 10) - 1 : 0;
+      const result = presetsList.applyPreset(config, idx, Math.max(0, modelChoice));
+
+      if (result.error) {
+        console.log(`${C.red}${result.error}${C.reset}`);
+        break;
+      }
+
+      saveConfig();
+      buildAgent();
+
+      console.log(div("="));
+      console.log(`${C.green}✓${C.reset} 已切换到 ${C.bold + C.cyan}${result.provider.name}${C.reset}`);
+      console.log(`  模型:   ${C.bold}${config.llm.model}${C.reset}`);
+      console.log(`  URL:    ${C.cyan}${config.llm.baseURL}${C.reset}`);
+      console.log(`  温度:   ${config.llm.temperature}  |  TopP: ${config.llm.topP}`);
+      console.log(`  上下文: ${(config.llm.contextWindow || 0).toLocaleString()} tokens`);
+      console.log(div());
+      console.log(`  下一步: ${C.yellow}/api key <你的Key>${C.reset}`);
       break;
     }
     case "tool_search": {
