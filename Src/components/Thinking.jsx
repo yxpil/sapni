@@ -9,13 +9,13 @@ const Thinking = React.memo(function Thinking({ text, iteration, content }) {
         <Text color="magenta"><Spinner type="dots" /></Text>
         <Text color="magenta" bold>思考中 / Thinking</Text>
         {iteration > 1 && (
-          <Text color="gray" dimColor>Iteration {iteration}</Text>
+          <Text color="gray" dimColor>第 {iteration} 轮 / Iteration {iteration}</Text>
         )}
       </Box>
       
       {(content || text) && (
         <Box marginTop={1} flexDirection="column">
-          <Text color="cyan" dimColor>[Process]</Text>
+          <Text color="cyan" dimColor>[思考过程 / Reasoning]</Text>
           <Text color="white" marginTop={0.5}>
             {content || text}
           </Text>

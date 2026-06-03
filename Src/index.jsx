@@ -161,51 +161,51 @@ function getAgent() {
 }
 
 const COMMANDS = [
-  { cmd: "/help", desc: "显示帮助" },
-  { cmd: "/exit", desc: "退出程序" },
-  { cmd: "/reset", desc: "重置对话" },
-  { cmd: "/clear", desc: "清空对话" },
-  { cmd: "/version", desc: "显示版本" },
-  { cmd: "/status", desc: "查看状态" },
-  { cmd: "/ctx", desc: "上下文用量" },
-  { cmd: "/tools", desc: "列出工具" },
-  { cmd: "/tools_more", desc: "全部工具(含扩展)" },
-  { cmd: "/tool_search", desc: "搜索工具" },
-  { cmd: "/tool_list_saved", desc: "已保存的工具" },
-  { cmd: "/tool_save", desc: "保存工具到文件" },
-  { cmd: "/tool_del_saved", desc: "删除已保存工具" },
-  { cmd: "/temp", desc: "设置温度 (0-2)" },
+  { cmd: "/help", desc: "显示帮助 / Show help" },
+  { cmd: "/exit", desc: "退出程序 / Exit" },
+  { cmd: "/reset", desc: "重置对话 / Reset" },
+  { cmd: "/clear", desc: "清空对话 / Clear" },
+  { cmd: "/version", desc: "显示版本 / Version" },
+  { cmd: "/status", desc: "查看状态 / Status" },
+  { cmd: "/ctx", desc: "上下文用量 / Context" },
+  { cmd: "/tools", desc: "列出工具 / List tools" },
+  { cmd: "/tools_more", desc: "全部工具(含扩展) / All tools" },
+  { cmd: "/tool_search", desc: "搜索工具 / Search tools" },
+  { cmd: "/tool_list_saved", desc: "已保存的工具 / Saved tools" },
+  { cmd: "/tool_save", desc: "保存工具到文件 / Save tool" },
+  { cmd: "/tool_del_saved", desc: "删除已保存工具 / Delete tool" },
+  { cmd: "/temp", desc: "设置温度 (0-2) / Set temp" },
   { cmd: "/topp", desc: "设置 TopP (0-1)" },
-  { cmd: "/token", desc: "设置最大输出 tokens" },
-  { cmd: "/memory", desc: "记忆统计" },
-  { cmd: "/memory_list", desc: "列出记忆条目" },
-  { cmd: "/memory_search", desc: "搜索记忆" },
-  { cmd: "/memory_del", desc: "删除记忆" },
-  { cmd: "/memory_clear", desc: "清空记忆" },
-  { cmd: "/compress", desc: "压缩上下文" },
-  { cmd: "/history", desc: "最近对话" },
-  { cmd: "/history files", desc: "历史文件列表" },
-  { cmd: "/history search", desc: "搜索历史" },
-  { cmd: "/history read", desc: "读取历史文件" },
-  { cmd: "/sp_server", desc: "API 服务状态" },
-  { cmd: "/sp_server start", desc: "启动 API 服务" },
-  { cmd: "/sp_server stop", desc: "停止 API 服务" },
+  { cmd: "/token", desc: "设置最大输出 tokens / Max tokens" },
+  { cmd: "/memory", desc: "记忆统计 / Memory stats" },
+  { cmd: "/memory_list", desc: "列出记忆条目 / List memory" },
+  { cmd: "/memory_search", desc: "搜索记忆 / Search memory" },
+  { cmd: "/memory_del", desc: "删除记忆 / Delete memory" },
+  { cmd: "/memory_clear", desc: "清空记忆 / Clear memory" },
+  { cmd: "/compress", desc: "压缩上下文 / Compress" },
+  { cmd: "/history", desc: "最近对话 / Recent history" },
+  { cmd: "/history files", desc: "历史文件列表 / History files" },
+  { cmd: "/history search", desc: "搜索历史 / Search history" },
+  { cmd: "/history read", desc: "读取历史文件 / Read history" },
+  { cmd: "/sp_server", desc: "API 服务状态 / Server status" },
+  { cmd: "/sp_server start", desc: "启动 API 服务 / Start server" },
+  { cmd: "/sp_server stop", desc: "停止 API 服务 / Stop server" },
   { cmd: "/sp_token", desc: "创建 API Token" },
   { cmd: "/sp_tokens", desc: "列出 API Tokens" },
   { cmd: "/sp_token_del", desc: "删除 API Token" },
-  { cmd: "/sessions", desc: "列出会话" },
-  { cmd: "/session", desc: "查看会话" },
-  { cmd: "/session_search", desc: "搜索会话" },
-  { cmd: "/provider", desc: "一键切换 AI 提供商" },
-  { cmd: "/persona", desc: "设置 AI 身份/性格" },
-  { cmd: "/persona reset", desc: "重置身份为默认" },
-  { cmd: "/trusted", desc: "受信任工具" },
-  { cmd: "/trust", desc: "信任工具" },
-  { cmd: "/untrust", desc: "取消信任" },
-  { cmd: "/llm", desc: "查看 LLM 配置" },
+  { cmd: "/sessions", desc: "列出会话 / List sessions" },
+  { cmd: "/session", desc: "查看会话 / View session" },
+  { cmd: "/session_search", desc: "搜索会话 / Search sessions" },
+  { cmd: "/provider", desc: "一键切换 AI 提供商 / Switch provider" },
+  { cmd: "/persona", desc: "设置 AI 身份/性格 / Set persona" },
+  { cmd: "/persona reset", desc: "重置身份为默认 / Reset persona" },
+  { cmd: "/trusted", desc: "受信任工具 / Trusted tools" },
+  { cmd: "/trust", desc: "信任工具 / Trust tool" },
+  { cmd: "/untrust", desc: "取消信任 / Untrust" },
+  { cmd: "/llm", desc: "查看 LLM 配置 / LLM config" },
   { cmd: "/llm key", desc: "设置 API Key" },
-  { cmd: "/llm url", desc: "设置 API 地址" },
-  { cmd: "/llm model", desc: "设置模型名称" },
+  { cmd: "/llm url", desc: "设置 API 地址 / Set URL" },
+  { cmd: "/llm model", desc: "设置模型名称 / Set model" },
 ];
 
 function App() {
@@ -921,11 +921,11 @@ function App() {
             </Box>
             <Box flexGrow={1} flexShrink={1} flexDirection="column" paddingX={3} minWidth={40}>
               <Text color="cyanBright" bold>Sapni v{VER}</Text>
-              <Text color="cyan" dimColor>自进化 AI · 终端助手 · Ink</Text>
+              <Text color="cyan" dimColor>自进化 AI · 终端助手 / Self-Evolving AI · Terminal Agent</Text>
               <Text>{"\n"}</Text>
-              <Text color="white">Terminal-native AI coding assistant</Text>
+              <Text color="white">终端原生 AI 编程助手 / Terminal-native AI coding assistant</Text>
               <Text>{"\n"}</Text>
-              <Text color="gray">/ command menu · ↑↓ select · Enter confirm</Text>
+              <Text color="gray">/ 命令菜单 · ↑↓ 选择 · Enter 确认 / command menu · select · confirm</Text>
             </Box>
           </Box>
           <Box marginTop={1}>
@@ -953,7 +953,7 @@ function App() {
         </Box>
         <Box flexGrow={1} flexShrink={1} flexDirection="column" minWidth={30}>
           <Text color="cyanBright" bold>Sapni v{VER}</Text>
-          <Text color="cyan" dimColor>自进化 AI · 终端助手 · Ink</Text>
+          <Text color="cyan" dimColor>自进化 AI · 终端助手 / Self-Evolving AI · Terminal Agent</Text>
         </Box>
       </Box>
       <Box bg="#21262d" paddingY={0}><Text color="#58a6ff">{"─".repeat(cols - 2)}</Text></Box>
