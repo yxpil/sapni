@@ -25,7 +25,7 @@ const SAPNI_CONFIG = path.join(SAPNI_DIR, "config.json");
 const PKG_CONFIG = path.join(__dirname, "..", "config.json");
 const LOGO_PATH = path.join(__dirname, "..", "Logos", "StartLogo.txt");
 
-const VER = "1.1.6-3";
+const VER = "1.1.6-4";
 
 function ensureDir() { if (!fs.existsSync(SAPNI_DIR)) fs.mkdirSync(SAPNI_DIR, { recursive: true }); }
 function loadConfig() {
@@ -293,7 +293,12 @@ function App() {
   }, []);
 
   const run = useCallback(async (query) => {
-    if (blockedRef.current) return;
+    if (blockedRef.current) {
+      // 如果已经在执行，重新入队而非丢弃（防御性保险）
+      queueRef.current = [...queueRef.current, query];
+      setQueueLen(queueRef.current.length);
+      return;
+    }
     blockedRef.current = true;
     setBlocked(true);
     setThinking(true);
@@ -378,16 +383,14 @@ function App() {
 
     blockedRef.current = false;
     setBlocked(false);
-    // Process next in queue
+    // Process next in queue (即时执行，消除 setTimeout 竞态窗口)
     const q = queueRef.current;
     if (q.length > 0) {
       const [next, ...rest] = q;
       queueRef.current = rest;
       setQueueLen(rest.length);
-      setTimeout(() => {
-        addMsg("user", next);
-        run(next);
-      }, 50);
+      addMsg("user", next);
+      run(next);
     }
   }, [addMsg, cols]);
 
