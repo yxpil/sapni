@@ -1,8 +1,12 @@
 ; Sapni AI — Windows 安装程序 (NSIS)
-; 编译: makensis windows-installer.nsi
+; 编译: makensis /DVERSION=1.1.8 windows-installer.nsi
+
+!ifndef VERSION
+  !define VERSION "1.1.8"
+!endif
 
 !define PRODUCT_NAME "Sapni AI"
-!define PRODUCT_VERSION "1.1.8"
+!define PRODUCT_VERSION "${VERSION}"
 !define PRODUCT_PUBLISHER "yxpil"
 !define PRODUCT_WEB_SITE "https://sapni.yxpil.com"
 
