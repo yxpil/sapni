@@ -24,7 +24,7 @@ class LLMClient {
     this.totalCompletionTokens = 0;
   }
 
-  async chat(messages, tools = null) {
+  async chat(messages, tools = null, toolChoice = "auto") {
     const body = {
       model: this.model,
       messages,
@@ -36,7 +36,7 @@ class LLMClient {
 
     if (tools && tools.length > 0) {
       body.tools = tools;
-      body.tool_choice = "auto";
+      body.tool_choice = toolChoice;
     }
 
     const result = await this._request("/chat/completions", JSON.stringify(body));
@@ -44,7 +44,7 @@ class LLMClient {
     return result;
   }
 
-  async chatStream(messages, onToken, tools = null) {
+  async chatStream(messages, onToken, tools = null, toolChoice = "auto") {
     const body = {
       model: this.model,
       messages,
@@ -57,7 +57,7 @@ class LLMClient {
 
     if (tools && tools.length > 0) {
       body.tools = tools;
-      body.tool_choice = "auto";
+      body.tool_choice = toolChoice;
     }
 
     return this._requestStream("/chat/completions", JSON.stringify(body), onToken);

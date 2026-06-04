@@ -5,7 +5,7 @@ const { syntaxCheck } = require("./syntax_check");
 
 const readFileTool = {
   name: "read_file",
-  description: "读取指定路径的文件内容",
+  description: "读取指定路径的文件内容 (支持: 读/查看/打开文件, 看代码, 检查)",
   parameters: {
     filePath: { type: "string", required: true, description: "文件路径" },
   },
@@ -17,7 +17,7 @@ const readFileTool = {
 
 const writeFileTool = {
   name: "write_file",
-  description: "创建或覆盖文件(自动创建父目录)",
+  description: "创建或覆盖文件(建/新建/写/生成/保存/输出文件到指定路径,自动创建父目录)",
   dangerous: true,
   parameters: {
     filePath: { type: "string", required: true, description: "文件路径" },
@@ -38,7 +38,7 @@ const writeFileTool = {
 
 const deleteFileTool = {
   name: "delete_file",
-  description: "删除指定文件或空目录",
+  description: "删除指定文件或空目录 (删/移除/清空/清理文件或目录)",
   dangerous: true,
   parameters: {
     filePath: { type: "string", required: true, description: "要删除的文件或目录路径" },
@@ -59,7 +59,7 @@ const deleteFileTool = {
 
 const moveFileTool = {
   name: "move_file",
-  description: "移动/重命名文件或目录",
+  description: "移动/重命名/移位文件或目录 (移动/重命名)",
   dangerous: true,
   parameters: {
     source: { type: "string", required: true, description: "源路径" },
@@ -78,7 +78,7 @@ const moveFileTool = {
 
 const copyFileTool = {
   name: "copy_file",
-  description: "复制文件到目标路径",
+  description: "复制文件到目标路径 (复制/拷贝/备份文件)",
   dangerous: true,
   parameters: {
     source: { type: "string", required: true, description: "源文件路径" },
@@ -97,7 +97,7 @@ const copyFileTool = {
 
 const listDirTool = {
   name: "list_dir",
-  description: "列出目录内容(支持递归)",
+  description: "列出目录内容(浏览/查看/打开目录, 支持递归, 看文件夹里有什么)",
   parameters: {
     dirPath: { type: "string", required: true, description: "目录路径" },
     recursive: { type: "boolean", required: false, description: "是否递归, 默认false" },
@@ -162,7 +162,7 @@ const searchInFilesTool = {
 
 const findFilesTool = {
   name: "find_files",
-  description: "按文件名模式查找文件(glob), 如 '*.js' 或 'test*.ts'",
+  description: "按文件名模式查找文件(搜索/找文件, glob匹配如'*.js'), 参数: pattern(glob模式), dirPath(起始目录)",
   parameters: {
     pattern: { type: "string", required: true, description: "glob模式, 如 '*.js' 或 '**/*.test.js'" },
     dirPath: { type: "string", required: true, description: "搜索起始目录" },

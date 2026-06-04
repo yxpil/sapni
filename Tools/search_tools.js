@@ -4,7 +4,7 @@ const http = require("http");
 
 const execConsoleTool = {
   name: "exec_console",
-  description: "执行终端命令并返回结果. 始终返回: exit code + stdout + stderr + 耗时",
+  description: "执行终端命令/运行程序/启动服务/跑脚本 并返回结果. 始终返回: exit code + stdout + stderr + 耗时 (支持: 运行/执行/跑/启动/安装/编译/构建/测试/部署)",
   dangerous: true,
   parameters: {
     command: { type: "string", required: true, description: "要执行的命令" },

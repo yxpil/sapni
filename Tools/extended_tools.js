@@ -465,7 +465,7 @@ const treeTool = {
 
 const webSearchTool = {
   name: "web_search",
-  description: "用Bing搜索互联网获取实时信息. 用于查文档/新闻/最新资料. 自动回退浏览器",
+  description: "搜索网络/百度/Bing/查资料/找信息. 可设置结果数 & 来源偏好 (支持: 搜索/查/找资料/查询/百度/Bing/Google)",
   parameters: {
     query: { type: "string", required: true, description: "搜索关键词" },
     num: { type: "number", required: false, description: "结果数量, 默认5, 最多10" },

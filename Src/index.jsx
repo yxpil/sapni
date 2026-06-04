@@ -25,7 +25,7 @@ const SAPNI_CONFIG = path.join(SAPNI_DIR, "config.json");
 const PKG_CONFIG = path.join(__dirname, "..", "config.json");
 const LOGO_PATH = path.join(__dirname, "..", "Logos", "StartLogo.txt");
 
-const VER = "1.1.7";
+const VER = "1.1.8";
 
 function ensureDir() { if (!fs.existsSync(SAPNI_DIR)) fs.mkdirSync(SAPNI_DIR, { recursive: true }); }
 function loadConfig() {
@@ -219,7 +219,7 @@ const COMMANDS = [
   { cmd: "/persona show", desc: "显示当前身份 / Show persona" },
   { cmd: "/persona off", desc: "关闭自定义身份, 使用默认提示 / Disable persona" },
   { cmd: "/trusted", desc: "受信任工具 / Trusted tools" },
-  { cmd: "/trust", desc: "信任工具 / Trust tool" },
+  { cmd: "/trust", desc: "信任工具 / Trust: on(会话级) / off / status / all / <name>" },
   { cmd: "/untrust", desc: "取消信任 / Untrust" },
   { cmd: "/update", desc: "更新到最新版 / Update to latest" },
   { cmd: "/llm", desc: "查看 LLM 配置 / LLM config" },
@@ -819,19 +819,39 @@ function App() {
     else if (cmd === "trusted") {
       const trusted = CONFIG.tools?.trustedTools || [];
       if (trusted.includes("all") || trusted.includes("*")) {
-        say("(全部工具已信任 / All tools trusted)");
+        say("(全部工具已永久信任 / All tools permanently trusted)");
+        return;
+      }
+      const sessionOn = Tools.getSessionTrust();
+      if (sessionOn) {
+        say("(会话信任已开启 / Session trust is ON — 本轮全部免确认)");
         return;
       }
       if (!trusted.length) { say("(无信任工具 / No trusted tools)"); return; }
       say("Trusted tools (" + trusted.length + "):\n" + trusted.join("\n"));
     }
     else if (cmd === "trust") {
-      if (!rest) { say("用法: /trust <工具名> / Usage: /trust <name>"); return; }
+      if (!rest) { say("用法: /trust on|off|status|<工具名> / Usage: /trust on|off|status|<name>"); return; }
+      if (rest === "on") {
+        Tools.setSessionTrust(true);
+        say("✅ 会话信任已开启 / Session trust ON — 本轮所有工具免确认");
+        return;
+      }
+      if (rest === "off") {
+        Tools.setSessionTrust(false);
+        say("🔒 会话信任已关闭 / Session trust OFF — 恢复每次确认");
+        return;
+      }
+      if (rest === "status") {
+        const s = Tools.getTrustStatus();
+        say(s.label + (s.all ? "" : "\n已信任: " + (s.tools?.join(", ") || "(无)")));
+        return;
+      }
       if (rest === "all" || rest === "*") {
         CONFIG.tools.trustedTools = ["all"];
         CONFIG.tools.permissionMode = "trust_all";
         saveConfig(CONFIG);
-        say("已信任全部工具 / All tools trusted");
+        say("已永久信任全部工具 / All tools permanently trusted");
         return;
       }
       Tools.addTrusted(rest);
@@ -840,12 +860,10 @@ function App() {
       say("已信任 / Trusted: " + rest);
     }
     else if (cmd === "untrust") {
-      if (!rest) { say("用法: /untrust <工具名> / Usage: /untrust <name>"); return; }
-      if (rest === "all" || rest === "*") {
-        CONFIG.tools.trustedTools = [];
-        CONFIG.tools.permissionMode = "ask";
-        saveConfig(CONFIG);
-        say("已取消所有信任 / All trust revoked");
+      if (!rest) { say("用法: /untrust on|off|<工具名> / Usage: /untrust on|off|<name>"); return; }
+      if (rest === "on" || rest === "off") {
+        Tools.setSessionTrust(false);
+        say("🔒 会话信任已关闭 / Session trust OFF");
         return;
       }
       Tools.removeTrusted(rest);

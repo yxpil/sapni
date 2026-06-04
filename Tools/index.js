@@ -19,6 +19,7 @@ let toolRegistry = {
 
 let permissionCallback = null;
 let trustedNames = new Set();
+let sessionTrust = false; // 会话级信任: true=本轮免确认
 const CUSTOM_DIR = path.join(require("os").homedir(), ".sapni", "Tools", "custom");
 
 function loadCustomTools() {
@@ -99,6 +100,17 @@ function setPermissionCallback(cb) { permissionCallback = cb; }
 function setTrusted(names) { trustedNames = new Set(names); }
 function addTrusted(name) { trustedNames.add(name); }
 function removeTrusted(name) { trustedNames.delete(name); }
+
+// 会话级信任管理
+function setSessionTrust(on) { sessionTrust = on; }
+function getSessionTrust() { return sessionTrust; }
+function getTrustStatus() {
+  if (sessionTrust) return { level: "session", label: "会话信任 / Session Trust", all: true };
+  if (trustedNames.has("*") || trustedNames.has("all")) return { level: "all", label: "全部信任 / All Trusted", all: true };
+  if (trustedNames.size > 0) return { level: "partial", label: "部分信任 / Partial Trust", all: false, tools: [...trustedNames] };
+  return { level: "none", label: "无信任 / No Trust", all: false, tools: [] };
+}
+
 function loadTools() { return { ...toolRegistry }; }
 
 function registerTool(name, tool) { toolRegistry[name] = tool; }
@@ -126,6 +138,8 @@ function searchToolRegistry(query) {
 function getTool(name) { return toolRegistry[name] || null; }
 
 async function checkPermission(name, args) {
+  // 会话级信任优先: 开启后所有工具免确认
+  if (sessionTrust) return true;
   if (trustedNames.has("*") || trustedNames.has("all") || trustedNames.has(name)) return true;
   if (permissionCallback) return permissionCallback(name, args);
   return false;
@@ -241,7 +255,7 @@ function filterToolDeclarations(prompt) {
     return toFunctionDeclarations();
   }
 
-  const alwaysInclude = ["search_memory", "save_memory", "list_memory", "delete_memory", "mem_rom", "mem_ram", "search_history", "list_history_files", "list_sessions", "view_session", "search_sessions", "browse_page", "browse_page_text", "compress_context", "truncate_context", "submit_feedback", "forget_conversation", "restart_session", "todo_write"];
+  const alwaysInclude = ["search_memory", "save_memory", "list_memory", "delete_memory", "mem_rom", "mem_ram", "search_history", "list_history_files", "list_sessions", "view_session", "search_sessions", "browse_page", "browse_page_text", "compress_context", "truncate_context", "submit_feedback", "forget_conversation", "restart_session", "todo_write", "get_trust_status", "list_available_tools"];
   for (const name of alwaysInclude) {
     if (toolRegistry[name]) matched.add(name);
   }
@@ -299,6 +313,49 @@ deleteToolFile = function (name) {
   return result;
 };
 
+// ========== 模型自省工具: 让模型能查自己的信任状态和工具列表 ==========
+
+registerTool("get_trust_status", {
+  name: "get_trust_status",
+  description: "查看当前信任状态: 会话级信任/永久信任/无信任/已信任哪些工具 (查自己有没有权限执行操作)",
+  parameters: {},
+  execute: async () => {
+    const s = getTrustStatus();
+    let msg = `[信任等级 / Trust Level] ${s.label}`;
+    if (s.level === "session") msg += "\n所有工具当前免确认 / All tools are auto-trusted for this session";
+    else if (s.level === "all") msg += "\n所有工具已永久信任 / All tools permanently trusted";
+    else if (s.level === "partial") msg += `\n已信任 / Trusted: ${s.tools.join(", ")}`;
+    else msg += "\n使用 /trust on 开启会话信任, 或 /trust <工具名> 信任特定工具";
+    return msg;
+  },
+});
+
+registerTool("list_available_tools", {
+  name: "list_available_tools",
+  description: "列出所有可用的工具(按分类), 查看完整工具列表. 如果当前注入的工具不够用可以用这个",
+  parameters: {},
+  execute: async () => {
+    const all = toFunctionDeclarations();
+    const cats = {};
+    for (const t of all) {
+      const desc = t.function.description;
+      let cat = "其他";
+      if (/file|写|创|删|移|复|查找|搜索/i.test(desc)) cat = "文件操作";
+      else if (/执行|终端|命令|console/i.test(desc)) cat = "终端命令";
+      else if (/搜索|网络|网页|浏览|fetch/i.test(t.function.name)) cat = "网络";
+      else if (/记忆|mem|history|session/i.test(t.function.name)) cat = "记忆/历史";
+      else if (/todo|timer|定时|skill|技能/i.test(t.function.name)) cat = "任务管理";
+      else if (/trust|权限|工具/i.test(t.function.name)) cat = "自省工具";
+      if (!cats[cat]) cats[cat] = [];
+      cats[cat].push(`  ${t.function.name} — ${desc.slice(0, 60)}`);
+    }
+    const lines = Object.entries(cats).map(([cat, tools]) =>
+      `[${cat}]\n${tools.join("\n")}`
+    );
+    return `可用工具 / Available Tools (${all.length} 个):\n\n${lines.join("\n\n")}`;
+  },
+});
+
 function listToolNames() { return Object.keys(toolRegistry); }
 
 function showAllToolDeclarations() { return toFunctionDeclarations(); }
@@ -307,6 +364,7 @@ module.exports = {
   loadTools, getTool, executeTool, checkPermission, toFunctionDeclarations,
   registerTool, unregisterTool, searchToolRegistry, listToolNames,
   setPermissionCallback, setTrusted, addTrusted, removeTrusted,
+  setSessionTrust, getSessionTrust, getTrustStatus,
   saveToolToFile, deleteToolFile, listCustomTools,
   filterToolDeclarations, showAllToolDeclarations, _declarationsFrom,
   CUSTOM_DIR,

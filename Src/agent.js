@@ -219,6 +219,41 @@ class Agent {
     return this._repeatCount >= 300;
   }
 
+  /**
+   * 检测用户消息是否为"操作类请求"（建文件、运行代码等）
+   * 如果是，强制模型必须调用工具，不能只回文本
+   */
+  _isActionRequest(msg) {
+    if (!msg || typeof msg !== "string") return false;
+    const msgTrimmed = msg.trim();
+    // 纯知识性问题排除 — 这些只是问概念，不需要调工具
+    if (/^(怎么(用|写|学|配置|设置|改|实现|安装|编译|跑|调|看)|如何|什么是|为什么(要|会|不|没有)|哪个(是|更|比较)|有哪些|有没有(什么|人|办法|方法|工具|项目)|能不能解释|可不可以解释|请问(什么是|怎么|如何|什么是|什么叫做))/.test(msgTrimmed)) return false;
+    // 操作类关键词匹配
+    const actionPatterns = [
+      /建|创建|生成|新建|搭建|部署/,
+      /写|写入|保存|输出|导出|输出到/,
+      /删|除|移除|清理|清空|粉碎/,
+      /移动|复制|重命名|拷贝/,
+      /运行|执行|跑|启动|安装|编译|构建|发布/,
+      /修改|编辑|替换|追加|插入|更新|改/,
+      /搜索|查找|查一?下|找一?下|读取|打开|查看/,
+      /下载|上传|克隆|拉取|推送|同步/,
+      /测试|调试|检查|验证|确认|lint|格式化|分析/,
+      /桌面|目录|文件夹|文件|代码|项目|仓库|脚本/,
+    ];
+    for (const re of actionPatterns) {
+      if (re.test(msg)) return true;
+    }
+    return false;
+  }
+
+  _retryPredicate(userMsg, allMsgs, finalResponse) {
+    // 如果最终只有文本回复且没有调用任何工具，需要重试
+    if (!finalResponse) return false;
+    const calledTools = allMsgs.filter(m => m.role === "tool");
+    return calledTools.length === 0 && this._isActionRequest(userMsg);
+  }
+
   async run(userMessage, opts = {}) {
     const { onContent, onToolCall, onToolResult, onThinking, onContextPct } = opts;
     this.memory.addUser(userMessage);
@@ -231,6 +266,8 @@ class Agent {
     let warned95 = false;
 
     const activeTools = Tools.filterToolDeclarations(userMessage);
+    const isAction = this._isActionRequest(userMessage);
+    this._retried = false;
 
     for (let i = 0; i < this.maxIterations; i++) {
       if (onContextPct || onThinking) {
@@ -242,7 +279,9 @@ class Agent {
 
       if (onThinking) onThinking();
 
-      const result = await this.llm.chatStream(messages, onContent || null, activeTools);
+      // 操作请求首次调用强制 required，否则 auto
+      const toolChoice = (isAction && i === 0 && !this._retried) ? "required" : "auto";
+      const result = await this.llm.chatStream(messages, onContent || null, activeTools, toolChoice);
 
       if (result.toolCalls && result.toolCalls.length > 0) {
         if (this._detectLoop(result.toolCalls)) {
@@ -291,6 +330,62 @@ class Agent {
       }
       allMsgs.push({ role: "assistant", content: "(empty)", reasoning_content: result.reasoningContent || "" });
       finalResponse = "(empty)"; break;
+    }
+
+    // 重试兜底: 操作请求但模型只回了文本且没调过工具 → 强制再试一次
+    if (isAction && !this._retried && finalResponse && finalResponse !== "(empty)") {
+      const calledTools = allMsgs.filter(m => m.role === "tool" || m.tool_calls);
+      if (calledTools.length === 0) {
+        this._retried = true;
+        // 重置会话状态, 从原始 history 重建 messages (不含失败的回复)
+        messages = this._buildMessages();
+        allMsgs = [];
+        finalResponse = "";
+
+        for (let i = 0; i < this.maxIterations; i++) {
+          if (onThinking) onThinking();
+          const result = await this.llm.chatStream(messages, onContent || null, activeTools, "required");
+
+          if (result.toolCalls && result.toolCalls.length > 0) {
+            if (this._detectLoop(result.toolCalls)) {
+              finalResponse = "(检测到工具调用循环, 已自动终止)";
+              break;
+            }
+            const stepAssistant = {
+              role: "assistant", content: null,
+              reasoning_content: result.reasoningContent || "",
+              tool_calls: result.toolCalls.map((tc) => ({
+                id: tc.id, type: "function",
+                function: { name: tc.function.name, arguments: tc.function.arguments },
+              })),
+            };
+            allMsgs.push(stepAssistant);
+            const toolMsgs = [];
+            for (const tc of result.toolCalls) {
+              const fnName = tc.function.name;
+              let fnArgs = {};
+              try { fnArgs = JSON.parse(tc.function.arguments); } catch (_) {}
+              if (onToolCall) onToolCall(fnName, fnArgs, i + 1);
+              let toolResult;
+              try { toolResult = await Tools.executeTool(fnName, fnArgs); }
+              catch (e) { toolResult = `error: ${e.message}`; }
+              const capped = String(toolResult).slice(0, MAX_TOOL_RESULT_CHARS);
+              if (onToolResult) onToolResult(fnName, capped.slice(0, 300));
+              toolMsgs.push({ role: "tool", tool_call_id: tc.id, name: fnName, content: capped });
+              allMsgs.push({ role: "tool", name: fnName, content: capped.slice(0, 500) });
+            }
+            messages.push(stepAssistant);
+            messages.push(...toolMsgs);
+            continue;
+          }
+          if (result.content) {
+            allMsgs.push({ role: "assistant", content: result.content, reasoning_content: result.reasoningContent || "" });
+            finalResponse = result.content; break;
+          }
+          allMsgs.push({ role: "assistant", content: "(empty)", reasoning_content: result.reasoningContent || "" });
+          finalResponse = "(empty)"; break;
+        }
+      }
     }
 
     this.memory.addAssistant(finalResponse);
