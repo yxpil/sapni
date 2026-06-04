@@ -25,7 +25,7 @@ const SAPNI_CONFIG = path.join(SAPNI_DIR, "config.json");
 const PKG_CONFIG = path.join(__dirname, "..", "config.json");
 const LOGO_PATH = path.join(__dirname, "..", "Logos", "StartLogo.txt");
 
-const VER = "1.1.6-2";
+const VER = "1.1.6-3";
 
 function ensureDir() { if (!fs.existsSync(SAPNI_DIR)) fs.mkdirSync(SAPNI_DIR, { recursive: true }); }
 function loadConfig() {
@@ -221,6 +221,7 @@ const COMMANDS = [
   { cmd: "/trusted", desc: "受信任工具 / Trusted tools" },
   { cmd: "/trust", desc: "信任工具 / Trust tool" },
   { cmd: "/untrust", desc: "取消信任 / Untrust" },
+  { cmd: "/update", desc: "更新到最新版 / Update to latest" },
   { cmd: "/llm", desc: "查看 LLM 配置 / LLM config" },
   { cmd: "/llm key", desc: "设置 API Key" },
   { cmd: "/llm url", desc: "设置 API 地址 / Set URL" },
@@ -455,11 +456,12 @@ function App() {
         "\u2502  /sessions      \u4f1a\u8bdd / Sessions           \u2502",
         "\u2502  /session       \u67e5\u770b / View               \u2502",
         "\u2502  /provider      \u5207\u6362\u63d0\u4f9b\u5546 / Provider         \u2502",
-        "\u2502  /persona       \u8eab\u4efd\u8bbe\u5b9a / Persona   \u2502",
-        "\u2502  /llm           LLM \u914d\u7f6e / LLM config      \u2502",
-        "\u2502  /sp_server     API \u670d\u52a1 / Server          \u2502",
-        "\u2502  /trusted       \u4fe1\u4efb\u7ba1\u7406 / Trust    \u2502",
-        "\u2570\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500",
+        "│  /persona       身份设定 / Persona   │",
+        "│  /llm           LLM 配置 / LLM config      │",
+        "│  /sp_server     API 服务 / Server          │",
+        "│  /trusted       信任管理 / Trust    │",
+        "│  /update        更新 / Update            │",
+        "╰───────────────────────────────────────",
       ].join("\n"));
     }
     else if (cmd === "exit") process.exit(0);
@@ -847,6 +849,18 @@ function App() {
       CONFIG.tools.trustedTools = (CONFIG.tools?.trustedTools || []).filter((n) => n !== rest);
       saveConfig(CONFIG);
       say("已取消信任 / Untrusted: " + rest);
+    }
+    else if (cmd === "update") {
+      say("正在更新... / Updating...");
+      const { exec } = require("child_process");
+      exec("npm install -g sapni-ai@latest", { timeout: 60000 }, (err, stdout, stderr) => {
+        if (err) {
+          say("更新失败 / Update failed: " + (stderr || err.message).trim());
+          return;
+        }
+        const out = (stdout || stderr || "").trim();
+        say("✅ 更新完成! / Update complete!\n" + out.split("\n").slice(-3).join("\n") + "\n请重启 Sapni 生效 / Please restart Sapni");
+      });
     }
     else if (cmd === "provider" || cmd === "preset") {
       const choice = parseInt(rest.trim(), 10);

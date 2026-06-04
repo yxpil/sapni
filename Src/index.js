@@ -354,7 +354,7 @@ function showHelp() {
     ["/tool_save <name>", "持久化保存工具"], ["/tool_list_saved", "列出持久化工具"],
     ["/tool_del_saved <name>", "删除持久化工具"],
     ["/trusted", "查看受信任工具"], ["/trust <name>", "永久信任工具"],
-    ["/untrust <name>", "取消信任"], ["/status", "查看当前状态"],
+    ["/untrust <name>", "取消信任"], ["/update", "更新到最新版"], ["/status", "查看当前状态"],
     ["/ctx", "查看上下文使用量"],
     ["/api", "查看/配置 API 设置"],
     ["/api key <KEY>", "设置 API Key"],
@@ -535,7 +535,7 @@ async function handleSlashCommand(input) {
       break;
     }
     case "version": {
-      console.log(`${C.bold + C.cyan}${config.agent.name}${C.reset} v${config.agent.version || "1.1.6-2"}`);
+      console.log(`${C.bold + C.cyan}${config.agent.name}${C.reset} v${config.agent.version || "1.1.6-3"}`);
       break;
     }
     case "persona":
@@ -891,6 +891,21 @@ async function handleSlashCommand(input) {
       console.log(`${C.yellow}已取消信任: ${rest}${C.reset}`);
       break;
     }
+    case "update": {
+      console.log(`${C.cyan}正在更新...${C.reset}`);
+      const { exec } = require("child_process");
+      exec("npm install -g sapni-ai@latest", { timeout: 60000 }, (err, stdout, stderr) => {
+        if (err) {
+          console.log(`${C.red}更新失败: ${(stderr || err.message).trim()}${C.reset}`);
+          return;
+        }
+        const out = (stdout || stderr || "").trim();
+        console.log(`${C.green}✅ 更新完成!${C.reset}`);
+        console.log(out.split("\n").slice(-3).join("\n"));
+        console.log(`${C.yellow}请重启 Sapni 生效${C.reset}`);
+      });
+      break;
+    }
     case "tool_save": {
       if (!rest) { console.log(`用法: /tool_save <工具名> <JS代码>`); break; }
       const spaceIdx = rest.indexOf(" ");
@@ -1124,7 +1139,7 @@ async function handleInput(line) {
 async function main() {
   if (process.argv.includes("--version") || process.argv.includes("-v")) {
     loadConfig();
-    console.log(config.agent.version || "1.1.6-2");
+    console.log(config.agent.version || "1.1.6-3");
     process.exit(0);
   }
 
@@ -1136,7 +1151,7 @@ async function main() {
   exec("npm view sapni-ai version", { timeout: 10000 }, (err, stdout) => {
     if (!err) {
       const latest = stdout.trim();
-      const ver = config.agent.version || "1.1.6-2";
+      const ver = config.agent.version || "1.1.6-3";
       if (latest && latest !== ver) {
         console.log(`  ${C.yellow}⬆${C.reset} 新版本可用: ${C.cyan}${latest}${C.reset} (当前 ${ver})`);
         console.log(`     更新: ${C.dim}npm install -g sapni-ai@latest${C.reset}`);
@@ -1186,7 +1201,7 @@ async function main() {
   });
 
   const mw = maxWidth();
-  console.log(`\n  ${C.bold + C.cyan}${config.agent.name}${C.reset} v${config.agent.version || "1.1.6-2"}  ${C.dim}DeepSeek驱动 | 最大宽度: ${mw}列${C.reset}`);
+  console.log(`\n  ${C.bold + C.cyan}${config.agent.name}${C.reset} v${config.agent.version || "1.1.6-3"}  ${C.dim}DeepSeek驱动 | 最大宽度: ${mw}列${C.reset}`);
   console.log(`  ${C.dim}输入 ${C.yellow}/help${C.dim} 查看命令  |  输入 ${C.yellow}/${C.dim} 弹出命令菜单${C.reset}`);
   console.log(div("="));
 
