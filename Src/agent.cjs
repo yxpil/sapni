@@ -83,7 +83,7 @@ class Agent {
     this.callbacks = callbacks;
     this.maxIterations = MAX_ITERATIONS;
     this.systemInfo = buildSystemInfo();
-    this.systemPrompt = `${config.systemPrompt}\n\n[System Info]\n${this.systemInfo}`;
+    this.systemPrompt = `${config.systemPrompt}\n\n[Model Identity] ${config.llm?.model || 'unknown'} (Provider: ${config.llm?.provider || 'unknown'})\n\n[System Info]\n${this.systemInfo}`;
     if (config.persona) {
       this.systemPrompt = `[Identity] ${config.persona}\n\n${this.systemPrompt}`;
     }

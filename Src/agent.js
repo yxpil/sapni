@@ -48,7 +48,7 @@ class Agent {
     this.callbacks = callbacks;
     this.maxIterations = MAX_ITERATIONS;
     this.systemInfo = buildSystemInfo();
-    this.systemPrompt = `${config.systemPrompt}\n\n[系统环境]\n${this.systemInfo}`;
+    this.systemPrompt = `${config.systemPrompt}\n\n[模型身份] ${config.llm?.model || 'unknown'} (Provider: ${config.llm?.provider || 'unknown'})\n\n[系统环境]\n${this.systemInfo}`;
     if (config.persona) {
       this.systemPrompt = `[身份设定] ${config.persona}\n\n${this.systemPrompt}`;
     }
