@@ -1,0 +1,57 @@
+# 构建 Sapni AI Windows 安装程序
+# 推送到 winget-pkgs 前运行此工作流生成 installer
+# 生成产物: sapni-ai-{version}-setup.exe
+
+name: Build Windows Installer
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Sapni AI 版本 (例: 1.1.8)"
+        required: true
+        default: "1.1.8"
+  release:
+    types: [published]
+
+env:
+  NSIS_VERSION: 3.10
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安装 NSIS
+        run: |
+          choco install nsis -y --version=$env:NSIS_VERSION
+
+      - name: 构建安装程序
+        run: |
+          if ("${{ github.event_name }}" -eq "release") {
+            $version = "${{ github.event.release.tag_name }}" -replace '^v', ''
+          } else {
+            $version = "${{ github.event.inputs.version }}"
+          }
+          echo "Building sapni-ai v$version installer..."
+          makensis /DVERSION=$version scripts/windows-installer.nsi
+        shell: pwsh
+
+      - name: 上传产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: sapni-windows-installer
+          path: sapni-ai-*.exe
+
+      - name: 上传到 Release
+        if: github.event_name == 'release'
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: sapni-ai-*.exe
+          asset_name: sapni-ai-${{ github.event.release.tag_name }}-setup.exe
+          asset_content_type: application/x-msdownload
