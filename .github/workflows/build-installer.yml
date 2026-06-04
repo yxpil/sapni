@@ -44,7 +44,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: sapni-windows-installer
-          path: sapni-ai-*.exe
+          path: scripts/sapni-ai-*.exe
 
       - name: 上传到 Release
         if: github.event_name == 'release'
@@ -53,6 +53,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ github.event.release.upload_url }}
-          asset_path: sapni-ai-*.exe
+          asset_path: scripts/sapni-ai-*.exe
           asset_name: sapni-ai-${{ github.event.release.tag_name }}-setup.exe
           asset_content_type: application/x-msdownload

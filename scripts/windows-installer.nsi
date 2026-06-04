@@ -15,7 +15,7 @@
 
 ; --- 界面设置 ---
 Name "${PRODUCT_NAME} ${PRODUCT_VERSION}"
-OutFile "sapni-ai-${PRODUCT_VERSION}-setup.exe"
+OutFile "..\sapni-ai-${PRODUCT_VERSION}-setup.exe"
 InstallDir "$PROGRAMFILES\${PRODUCT_NAME}"
 RequestExecutionLevel admin
 BrandingText "Sapni AI"
