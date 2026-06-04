@@ -535,7 +535,7 @@ async function handleSlashCommand(input) {
       break;
     }
     case "version": {
-      console.log(`${C.bold + C.cyan}${config.agent.name}${C.reset} v${config.agent.version || "1.1.6-1"}`);
+      console.log(`${C.bold + C.cyan}${config.agent.name}${C.reset} v${config.agent.version || "1.1.6-2"}`);
       break;
     }
     case "persona":
@@ -1124,12 +1124,27 @@ async function handleInput(line) {
 async function main() {
   if (process.argv.includes("--version") || process.argv.includes("-v")) {
     loadConfig();
-    console.log(config.agent.version || "1.1.6-1");
+    console.log(config.agent.version || "1.1.6-2");
     process.exit(0);
   }
 
   loadConfig();
   showLogo();
+
+  // 启动时检查 npm 最新版本
+  const { exec } = require("child_process");
+  exec("npm view sapni-ai version", { timeout: 10000 }, (err, stdout) => {
+    if (!err) {
+      const latest = stdout.trim();
+      const ver = config.agent.version || "1.1.6-2";
+      if (latest && latest !== ver) {
+        console.log(`  ${C.yellow}⬆${C.reset} 新版本可用: ${C.cyan}${latest}${C.reset} (当前 ${ver})`);
+        console.log(`     更新: ${C.dim}npm install -g sapni-ai@latest${C.reset}`);
+        console.log(div("="));
+      }
+    }
+  });
+
   buildAgent();
 
   if (!config.llm.apiKey || config.llm.apiKey.startsWith("YOUR_")) {
@@ -1171,7 +1186,7 @@ async function main() {
   });
 
   const mw = maxWidth();
-  console.log(`\n  ${C.bold + C.cyan}${config.agent.name}${C.reset} v${config.agent.version || "1.1.6-1"}  ${C.dim}DeepSeek驱动 | 最大宽度: ${mw}列${C.reset}`);
+  console.log(`\n  ${C.bold + C.cyan}${config.agent.name}${C.reset} v${config.agent.version || "1.1.6-2"}  ${C.dim}DeepSeek驱动 | 最大宽度: ${mw}列${C.reset}`);
   console.log(`  ${C.dim}输入 ${C.yellow}/help${C.dim} 查看命令  |  输入 ${C.yellow}/${C.dim} 弹出命令菜单${C.reset}`);
   console.log(div("="));
 

@@ -25,7 +25,7 @@ const SAPNI_CONFIG = path.join(SAPNI_DIR, "config.json");
 const PKG_CONFIG = path.join(__dirname, "..", "config.json");
 const LOGO_PATH = path.join(__dirname, "..", "Logos", "StartLogo.txt");
 
-const VER = "1.1.6-1";
+const VER = "1.1.6-2";
 
 function ensureDir() { if (!fs.existsSync(SAPNI_DIR)) fs.mkdirSync(SAPNI_DIR, { recursive: true }); }
 function loadConfig() {
@@ -251,6 +251,7 @@ function App() {
 
   const [msgs, setMsgs] = useState([]);
   const [started, setStarted] = useState(false);
+  const [updateMsg, setUpdateMsg] = useState(null);
 
   useEffect(() => {
     setCtxPct(getAgent().estimateContextPct());
@@ -258,26 +259,15 @@ function App() {
 
   // 启动时检查 npm 最新版本
   useEffect(() => {
-    const https = require("https");
-    const req = https.get("https://registry.npmjs.org/sapni-ai/latest", { timeout: 5000 }, (res) => {
-    req.on("timeout", () => { req.destroy(); });
-      let data = "";
-      res.on("data", (c) => data += c);
-      res.on("end", () => {
-        try {
-          const pkg = JSON.parse(data);
-          const latest = pkg.version || "";
-          if (!latest) return;
-          // 简单比较：仅当 latest 不是当前版本的子版本时提示
-          // 如 1.1.5 > 1.1.5-2 不提示(prerelease更新)
-          // 如 1.1.6 > 1.1.5-2 提示
-          const base = VER.split("-")[0];
-          if (latest !== base && !latest.startsWith(base + "-")) {
-            addMsg("system", "⬆ 新版本可用: " + latest + " (当前 " + VER + ")\n  更新: npm install -g sapni-ai@latest");
-          }
-        } catch (_) {}
-      });
-    }).on("error", () => {});
+    const { exec } = require("child_process");
+    exec("npm view sapni-ai version", { timeout: 10000 }, (err, stdout) => {
+      if (err) return;
+      const latest = stdout.trim();
+      if (!latest || latest === VER) return;
+      const msg = "⬆ 新版本可用: " + latest + " (当前 " + VER + ")\n  更新: npm install -g sapni-ai@latest";
+      setUpdateMsg(msg);
+      addMsg("system", msg);
+    });
   }, []);
 
   // Real-time resize listener
@@ -1058,6 +1048,9 @@ function App() {
                 <Text key={i} color="magentaBright">{line}</Text>
               ))}
               <Text color="green">{CONFIG.llm.model} · {(CONFIG.llm.contextWindow || 1048576).toLocaleString()} tokens</Text>
+              {updateMsg && (
+                <Text color="yellow">{updateMsg.split("\n")[0]}</Text>
+              )}
             </Box>
             <Box flexGrow={1} flexShrink={1} flexDirection="column" paddingX={3} minWidth={40}>
               <Text color="cyanBright" bold>Sapni v{VER}</Text>
