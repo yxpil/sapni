@@ -16,7 +16,7 @@ Commands:
 Installers:
   - Architecture: x64
     InstallerUrl: https://github.com/yxpil/sapni/releases/download/v1.1.8/sapni-ai-1.1.8-setup.exe
-    InstallerSha256: PLACEHOLDER_REPLACE_AFTER_BUILD
+    InstallerSha256: 93B3CDB650CA2EFF3D0DA60C76B1A5BABBC1AB0869083010E7320084BEC84C0F
     ProductCode: Sapni AI
     Dependencies:
       PackageDependencies:
