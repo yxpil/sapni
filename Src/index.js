@@ -535,7 +535,7 @@ async function handleSlashCommand(input) {
       break;
     }
     case "version": {
-      console.log(`${C.bold + C.cyan}${config.agent.name}${C.reset} v${config.agent.version || "1.1.5"}`);
+      console.log(`${C.bold + C.cyan}${config.agent.name}${C.reset} v${config.agent.version || "1.1.6"}`);
       break;
     }
     case "persona":
@@ -1109,7 +1109,7 @@ async function handleInput(line) {
 async function main() {
   if (process.argv.includes("--version") || process.argv.includes("-v")) {
     loadConfig();
-    console.log(config.agent.version || "1.1.5");
+    console.log(config.agent.version || "1.1.6");
     process.exit(0);
   }
 
@@ -1156,7 +1156,7 @@ async function main() {
   });
 
   const mw = maxWidth();
-  console.log(`\n  ${C.bold + C.cyan}${config.agent.name}${C.reset} v${config.agent.version || "1.1.5"}  ${C.dim}DeepSeek驱动 | 最大宽度: ${mw}列${C.reset}`);
+  console.log(`\n  ${C.bold + C.cyan}${config.agent.name}${C.reset} v${config.agent.version || "1.1.6"}  ${C.dim}DeepSeek驱动 | 最大宽度: ${mw}列${C.reset}`);
   console.log(`  ${C.dim}输入 ${C.yellow}/help${C.dim} 查看命令  |  输入 ${C.yellow}/${C.dim} 弹出命令菜单${C.reset}`);
   console.log(div("="));
 

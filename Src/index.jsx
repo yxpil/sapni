@@ -25,7 +25,7 @@ const SAPNI_CONFIG = path.join(SAPNI_DIR, "config.json");
 const PKG_CONFIG = path.join(__dirname, "..", "config.json");
 const LOGO_PATH = path.join(__dirname, "..", "Logos", "StartLogo.txt");
 
-const VER = "1.1.5";
+const VER = "1.1.6";
 
 function ensureDir() { if (!fs.existsSync(SAPNI_DIR)) fs.mkdirSync(SAPNI_DIR, { recursive: true }); }
 function loadConfig() {
@@ -256,6 +256,30 @@ function App() {
     setCtxPct(getAgent().estimateContextPct());
   }, []);
 
+  // 启动时检查 npm 最新版本
+  useEffect(() => {
+    const https = require("https");
+    const req = https.get("https://registry.npmjs.org/sapni-ai/latest", { timeout: 5000 }, (res) => {
+    req.on("timeout", () => { req.destroy(); });
+      let data = "";
+      res.on("data", (c) => data += c);
+      res.on("end", () => {
+        try {
+          const pkg = JSON.parse(data);
+          const latest = pkg.version || "";
+          if (!latest) return;
+          // 简单比较：仅当 latest 不是当前版本的子版本时提示
+          // 如 1.1.5 > 1.1.5-2 不提示(prerelease更新)
+          // 如 1.1.6 > 1.1.5-2 提示
+          const base = VER.split("-")[0];
+          if (latest !== base && !latest.startsWith(base + "-")) {
+            addMsg("system", "⬆ 新版本可用: " + latest + " (当前 " + VER + ")\n  更新: npm install -g sapni-ai@latest");
+          }
+        } catch (_) {}
+      });
+    }).on("error", () => {});
+  }, []);
+
   // Real-time resize listener
   useEffect(() => {
     if (!stdout) return;
@@ -340,6 +364,14 @@ function App() {
         buf = "";
       } else {
         addMsg("system", "✗ " + e.message);
+        // 自动提交错误反馈
+        try {
+          const https = require("https");
+          const body = JSON.stringify({ message: "Sapni 运行错误: " + e.message + "\n版本: " + VER, version: VER });
+          const req = https.request("https://sapni.yxpil.com/api/feedback", { method: "POST", headers: { "Content-Type": "application/json" }, timeout: 5000 });
+          req.on("timeout", () => { req.destroy(); });
+          req.write(body); req.end();
+        } catch (_) {}
       }
       // Make sure blocked is cleared on error/abort
       blockedRef.current = false;
@@ -371,6 +403,7 @@ function App() {
   const slashRef = useRef({ filtered: [], clamped: 0 });
 
   const handleSubmit = useCallback((val) => {
+    try {
     const v = val.trim();
     if (!v) return;
     const { filtered, clamped } = slashRef.current;
@@ -437,7 +470,7 @@ function App() {
         "\u2502  /sp_server     API \u670d\u52a1 / Server          \u2502",
         "\u2502  /trusted       \u4fe1\u4efb\u7ba1\u7406 / Trust    \u2502",
         "\u2570\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500",
-      ]);
+      ].join("\n"));
     }
     else if (cmd === "exit") process.exit(0);
     else if (cmd === "reset") {
@@ -941,6 +974,17 @@ function App() {
       }
     }
     else { run(v); }
+    } catch (e) {
+      addMsg("system", "✗ 内部错误: " + e.message);
+      // 自动提交错误反馈
+      const https = require("https");
+      try {
+        const body = JSON.stringify({ message: "Sapni 内部错误: " + e.message + "\n版本: " + VER, version: VER });
+        const req = https.request("https://sapni.yxpil.com/api/feedback", { method: "POST", headers: { "Content-Type": "application/json" }, timeout: 5000 });
+        req.on("timeout", () => { req.destroy(); });
+        req.write(body); req.end();
+      } catch (_) {}
+    }
   }, [addMsg, run]);
 
   const slashInput = input.startsWith("/");
@@ -1149,3 +1193,19 @@ function App() {
 }
 
 const { waitUntilExit } = render(<App />);
+
+// 全局未捕获异常自动提交反馈
+process.on("uncaughtException", (e) => {
+  console.error("Sapni 崩溃:", e.message);
+  try {
+    const https = require("https");
+    const body = JSON.stringify({ message: "Sapni 崩溃: " + e.message + "\n" + (e.stack || "").slice(0, 200), version: "1.1.5-4" });
+    const req = https.request("https://sapni.yxpil.com/api/feedback", { method: "POST", headers: { "Content-Type": "application/json" }, timeout: 5000 });
+    req.on("timeout", () => { req.destroy(); });
+    req.write(body); req.end();
+  } catch (_) {}
+  process.exit(1);
+});
+process.on("unhandledRejection", (e) => {
+  console.error("Sapni 未捕获的Promise拒绝:", e?.message || e);
+});

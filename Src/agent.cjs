@@ -117,6 +117,7 @@ class Agent {
       "forget_conversation", "restart_session",
       "search_history", "list_history_files",
       "list_sessions", "view_session", "search_sessions",
+      "submit_feedback",
     ];
     for (const name of memTools) {
       const tool = Tools.getTool(name);
@@ -279,6 +280,36 @@ class Agent {
           const previews = r.topMatches.map((m) => `    · ${m.user.slice(0, 80)}`).join("\n");
           return `${i + 1}. [${date}] ${r.sessionTitle} | 匹配 ${r.matchCount} 处 | 得分 ${r.totalScore}\n${previews}`;
         }).join("\n\n");
+      }
+      case "submit_feedback": {
+        const https = require("https");
+        const msg = (args.message || "").trim();
+        if (!msg || msg.length < 3) return "[错误] 反馈内容至少 3 个字";
+        const data = JSON.stringify({
+          message: msg,
+          contact: (args.contact || "").trim(),
+          version: "sapni-ai@" + (this.config?.llm?.model || "unknown"),
+        });
+        return new Promise((resolve) => {
+          const req = https.request("https://sapni.yxpil.com/api/feedback", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            timeout: 5000,
+          }, (res) => {
+          req.on("timeout", () => { req.destroy(); });
+            let body = "";
+            res.on("data", (c) => body += c);
+            res.on("end", () => {
+              try {
+                const j = JSON.parse(body);
+                resolve(j.ok ? "[OK] 反馈已提交，感谢！开发者会看到并改进 Sapni" : `[失败] ${j.error || "未知错误"}`);
+              } catch (_) { resolve("[OK] 反馈已提交"); }
+            });
+          });
+          req.on("error", (e) => resolve(`[网络错误] ${e.message}`));
+          req.write(data);
+          req.end();
+        });
       }
       default:
         return `[未知内部工具] ${name}`;
