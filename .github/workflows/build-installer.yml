@@ -14,9 +14,6 @@ on:
   release:
     types: [published]
 
-env:
-  NSIS_VERSION: 3.10
-
 jobs:
   build:
     runs-on: windows-latest
@@ -25,19 +22,29 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: 安装 NSIS
+        shell: pwsh
         run: |
-          choco install nsis -y --version=$env:NSIS_VERSION
+          # 下载 NSIS 便携版直接解压使用
+          curl.exe -L -o nsis.zip "https://sourceforge.net/projects/nsis/files/NSIS%203/3.09/nsis-3.09.zip/download"
+          7z x nsis.zip -onsis > $null
+          echo "NSIS_HOME=$env:GITHUB_WORKSPACE\nsis\nsis-3.09" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: 构建安装程序
+        shell: pwsh
         run: |
+          # 添加 NSIS 到 PATH
+          $nsisDir = "$env:GITHUB_WORKSPACE\nsis\nsis-3.09"
+          echo "Adding $nsisDir to PATH"
+          echo "$nsisDir" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+          # 确定版本
           if ("${{ github.event_name }}" -eq "release") {
             $version = "${{ github.event.release.tag_name }}" -replace '^v', ''
           } else {
             $version = "${{ github.event.inputs.version }}"
           }
           echo "Building sapni-ai v$version installer..."
-          makensis /DVERSION=$version scripts/windows-installer.nsi
-        shell: pwsh
+          makensis.exe /DVERSION=$version scripts/windows-installer.nsi
 
       - name: 上传产物
         uses: actions/upload-artifact@v4
