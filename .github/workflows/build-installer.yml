@@ -28,6 +28,9 @@ jobs:
       - name: 构建安装程序
         shell: pwsh
         run: |
+          # NSIS 安装路径 (choco 装到 Program Files)
+          $env:Path += ";C:\Program Files (x86)\NSIS"
+
           # 确定版本
           if ("${{ github.event_name }}" -eq "release") {
             $version = "${{ github.event.release.tag_name }}" -replace '^v', ''
