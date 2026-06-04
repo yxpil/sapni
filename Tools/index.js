@@ -126,7 +126,7 @@ function searchToolRegistry(query) {
 function getTool(name) { return toolRegistry[name] || null; }
 
 async function checkPermission(name, args) {
-  if (trustedNames.has(name)) return true;
+  if (trustedNames.has("*") || trustedNames.has("all") || trustedNames.has(name)) return true;
   if (permissionCallback) return permissionCallback(name, args);
   return false;
 }
@@ -241,7 +241,7 @@ function filterToolDeclarations(prompt) {
     return toFunctionDeclarations();
   }
 
-  const alwaysInclude = ["search_memory", "save_memory", "list_memory", "delete_memory", "mem_rom", "mem_ram", "search_history", "list_history_files", "list_sessions", "view_session", "search_sessions", "browse_page", "browse_page_text", "compress_context", "truncate_context", "forget_conversation", "restart_session", "todo_write"];
+  const alwaysInclude = ["search_memory", "save_memory", "list_memory", "delete_memory", "mem_rom", "mem_ram", "search_history", "list_history_files", "list_sessions", "view_session", "search_sessions", "browse_page", "browse_page_text", "compress_context", "truncate_context", "submit_feedback", "forget_conversation", "restart_session", "todo_write"];
   for (const name of alwaysInclude) {
     if (toolRegistry[name]) matched.add(name);
   }

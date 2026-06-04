@@ -535,7 +535,7 @@ async function handleSlashCommand(input) {
       break;
     }
     case "version": {
-      console.log(`${C.bold + C.cyan}${config.agent.name}${C.reset} v${config.agent.version || "1.1.6"}`);
+      console.log(`${C.bold + C.cyan}${config.agent.name}${C.reset} v${config.agent.version || "1.1.6-1"}`);
       break;
     }
     case "persona":
@@ -855,13 +855,21 @@ async function handleSlashCommand(input) {
     case "trusted": {
       const names = [...new Set(config.tools?.trustedTools || [])];
       console.log(div());
-      if (names.length === 0) console.log("  (无受信任工具)");
+      if (names.includes("all") || names.includes("*")) console.log(`  ${C.green}全部工具已信任${C.reset}`);
+      else if (names.length === 0) console.log("  (无受信任工具)");
       else names.forEach((n) => console.log(`  ${C.green}✓${C.reset} ${n}`));
       console.log(div());
       break;
     }
     case "trust": {
       if (!rest) { console.log(`用法: /trust <工具名>`); break; }
+      if (rest === "all" || rest === "*") {
+        config.tools.trustedTools = ["all"];
+        config.tools.permissionMode = "trust_all";
+        saveConfig();
+        console.log(`${C.green}已信任全部工具${C.reset}`);
+        break;
+      }
       Tools.addTrusted(rest);
       config.tools.trustedTools = [...new Set([...(config.tools?.trustedTools || []), rest])];
       saveConfig();
@@ -870,6 +878,13 @@ async function handleSlashCommand(input) {
     }
     case "untrust": {
       if (!rest) { console.log(`用法: /untrust <工具名>`); break; }
+      if (rest === "all" || rest === "*") {
+        config.tools.trustedTools = [];
+        config.tools.permissionMode = "ask";
+        saveConfig();
+        console.log(`${C.yellow}已取消所有信任${C.reset}`);
+        break;
+      }
       Tools.removeTrusted(rest);
       config.tools.trustedTools = (config.tools?.trustedTools || []).filter((n) => n !== rest);
       saveConfig();
@@ -1109,7 +1124,7 @@ async function handleInput(line) {
 async function main() {
   if (process.argv.includes("--version") || process.argv.includes("-v")) {
     loadConfig();
-    console.log(config.agent.version || "1.1.6");
+    console.log(config.agent.version || "1.1.6-1");
     process.exit(0);
   }
 
@@ -1156,7 +1171,7 @@ async function main() {
   });
 
   const mw = maxWidth();
-  console.log(`\n  ${C.bold + C.cyan}${config.agent.name}${C.reset} v${config.agent.version || "1.1.6"}  ${C.dim}DeepSeek驱动 | 最大宽度: ${mw}列${C.reset}`);
+  console.log(`\n  ${C.bold + C.cyan}${config.agent.name}${C.reset} v${config.agent.version || "1.1.6-1"}  ${C.dim}DeepSeek驱动 | 最大宽度: ${mw}列${C.reset}`);
   console.log(`  ${C.dim}输入 ${C.yellow}/help${C.dim} 查看命令  |  输入 ${C.yellow}/${C.dim} 弹出命令菜单${C.reset}`);
   console.log(div("="));
 

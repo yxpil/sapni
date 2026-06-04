@@ -25,7 +25,7 @@ const SAPNI_CONFIG = path.join(SAPNI_DIR, "config.json");
 const PKG_CONFIG = path.join(__dirname, "..", "config.json");
 const LOGO_PATH = path.join(__dirname, "..", "Logos", "StartLogo.txt");
 
-const VER = "1.1.6";
+const VER = "1.1.6-1";
 
 function ensureDir() { if (!fs.existsSync(SAPNI_DIR)) fs.mkdirSync(SAPNI_DIR, { recursive: true }); }
 function loadConfig() {
@@ -823,11 +823,22 @@ function App() {
     }
     else if (cmd === "trusted") {
       const trusted = CONFIG.tools?.trustedTools || [];
+      if (trusted.includes("all") || trusted.includes("*")) {
+        say("(全部工具已信任 / All tools trusted)");
+        return;
+      }
       if (!trusted.length) { say("(无信任工具 / No trusted tools)"); return; }
       say("Trusted tools (" + trusted.length + "):\n" + trusted.join("\n"));
     }
     else if (cmd === "trust") {
       if (!rest) { say("用法: /trust <工具名> / Usage: /trust <name>"); return; }
+      if (rest === "all" || rest === "*") {
+        CONFIG.tools.trustedTools = ["all"];
+        CONFIG.tools.permissionMode = "trust_all";
+        saveConfig(CONFIG);
+        say("已信任全部工具 / All tools trusted");
+        return;
+      }
       Tools.addTrusted(rest);
       CONFIG.tools.trustedTools = [...new Set([...(CONFIG.tools?.trustedTools || []), rest])];
       saveConfig(CONFIG);
@@ -835,6 +846,13 @@ function App() {
     }
     else if (cmd === "untrust") {
       if (!rest) { say("用法: /untrust <工具名> / Usage: /untrust <name>"); return; }
+      if (rest === "all" || rest === "*") {
+        CONFIG.tools.trustedTools = [];
+        CONFIG.tools.permissionMode = "ask";
+        saveConfig(CONFIG);
+        say("已取消所有信任 / All trust revoked");
+        return;
+      }
       Tools.removeTrusted(rest);
       CONFIG.tools.trustedTools = (CONFIG.tools?.trustedTools || []).filter((n) => n !== rest);
       saveConfig(CONFIG);
