@@ -20,6 +20,7 @@ let toolRegistry = {
 let permissionCallback = null;
 let trustedNames = new Set();
 let sessionTrust = false; // 会话级信任: true=本轮免确认
+let degradedTools = new Set(); // 熔断工具集: 报错后标记, 仍可用但启动时红色提示
 const CUSTOM_DIR = path.join(require("os").homedir(), ".sapni", "Tools", "custom");
 
 function loadCustomTools() {
@@ -118,6 +119,13 @@ function removeTrusted(name) { trustedNames.delete(name); }
 // 会话级信任管理
 function setSessionTrust(on) { sessionTrust = on; }
 function getSessionTrust() { return sessionTrust; }
+
+// 工具熔断: 报错后标记, 不删除, 启动时红色警告
+function markDegraded(name) { degradedTools.add(name); }
+function isDegraded(name) { return degradedTools.has(name); }
+function getDegraded() { return [...degradedTools]; }
+function clearDegraded() { degradedTools.clear(); }
+
 function getTrustStatus() {
   if (sessionTrust) return { level: "session", label: "会话信任 / Session Trust", all: true };
   if (trustedNames.has("*") || trustedNames.has("all")) return { level: "all", label: "全部信任 / All Trusted", all: true };
@@ -166,7 +174,20 @@ async function executeTool(name, args) {
     const allowed = await checkPermission(name, args);
     if (!allowed) throw new Error(`permission denied: ${name}`);
   }
-  return tool.execute(args);
+  // 工具超时：默认30s, 可通过 args.tool_timeout 覆盖
+  const timeout = (args && args.tool_timeout) || tool.timeout || 30000;
+  try {
+    const result = await Promise.race([
+      tool.execute(args),
+      new Promise((_, reject) => setTimeout(() => reject(new Error(`tool timeout after ${timeout / 1000}s`)), timeout)),
+    ]);
+    return result;
+  } catch (e) {
+    if (e.message && e.message.includes("tool timeout")) {
+      return `[TIMEOUT] ${name} 超时 (${timeout / 1000}s), AI可跳过或重试 / timed out, can skip or retry`;
+    }
+    throw e;
+  }
 }
 
 function toFunctionDeclarations() {
@@ -379,6 +400,7 @@ module.exports = {
   registerTool, unregisterTool, searchToolRegistry, listToolNames,
   setPermissionCallback, setTrusted, addTrusted, removeTrusted,
   setSessionTrust, getSessionTrust, getTrustStatus,
+  markDegraded, isDegraded, getDegraded, clearDegraded,
   saveToolToFile, deleteToolFile, listCustomTools,
   filterToolDeclarations, showAllToolDeclarations, _declarationsFrom,
   CUSTOM_DIR,

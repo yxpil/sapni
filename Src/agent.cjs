@@ -366,7 +366,7 @@ class Agent {
   }
 
   async run(userMessage, opts = {}) {
-    const { onContent, onToolCall, onToolResult, onThinking, onContextPct, signal } = opts;
+    const { onContent, onToolCall, onToolResult, onThinking, onContextPct, onUsage, signal } = opts;
     this.memory.addUser(userMessage);
     let messages = this._buildMessages();
     let finalResponse = "";
@@ -411,6 +411,10 @@ class Agent {
       }
 
       const result = await this.llm.chatStream(messages, onContent || null, activeTools, signal);
+      // 实时上报 token 用量
+      if (onUsage) {
+        try { onUsage(this.llm.getUsage()); } catch (_) {}
+      }
 
       if (result.toolCalls && result.toolCalls.length > 0) {
         if (this._detectLoop(result.toolCalls)) {
@@ -452,7 +456,14 @@ class Agent {
             toolResult = await Tools.executeTool(fnName, fnArgs); 
           }
           catch (e) { 
-            toolResult = `error: ${e.message}`; 
+            toolResult = `error: ${e.message}`;
+            // 工具熔断：报错后标记, 不删除
+            try { Tools.markDegraded(fnName); } catch (_) {}
+          }
+
+          // 检测返回结果中的错误, 也触发熔断
+          if (toolResult && typeof toolResult === "string" && toolResult.startsWith("error:")) {
+            try { Tools.markDegraded(fnName); } catch (_) {}
           }
 
           const capped = String(toolResult).slice(0, MAX_TOOL_RESULT_CHARS);

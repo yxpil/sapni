@@ -10,7 +10,29 @@ class LLMClient {
     this.topP = config.topP;
     this.totalPromptTokens = 0;
     this.totalCompletionTokens = 0;
+    // 重试配置
+    this.maxRetries = config.maxRetries ?? 3;
+    this.retryDelay = config.retryDelay ?? 1500;
+    this._networkOk = true; // 网络状态缓存
   }
+
+  // 快速网络检测: DNS 解析 API 主机
+  async checkNetwork() {
+    const dns = require("dns");
+    try {
+      const url = new URL(this.baseURL);
+      await new Promise((resolve, reject) => {
+        dns.lookup(url.hostname, { timeout: 3000 }, (err) => err ? reject(err) : resolve());
+      });
+      this._networkOk = true;
+      return true;
+    } catch (_) {
+      this._networkOk = false;
+      return false;
+    }
+  }
+
+  isNetworkOk() { return this._networkOk; }
 
   getUsage() {
     return {
@@ -32,6 +54,37 @@ class LLMClient {
     this.temperature = config.temperature;
     this.topP = config.topP;
     this.contextWindow = config.contextWindow;
+    this.maxRetries = config.maxRetries ?? this.maxRetries;
+    this.retryDelay = config.retryDelay ?? this.retryDelay;
+  }
+
+  // 判断是否应重试
+  _shouldRetry(err, attempt) {
+    if (attempt >= this.maxRetries) return false;
+    const msg = (err.message || "").toLowerCase();
+    // 不重试: 认证错误
+    if (msg.includes("401") || msg.includes("403") || msg.includes("api key")) return false;
+    if (msg.includes("invalid") && msg.includes("key")) return false;
+    // 重试: 网络/超时/服务端错误/限流
+    return /econnrefused|etimedout|enotfound|econnreset|socket|502|503|504|429|timeout|network|dns/.test(msg);
+  }
+
+  // 带重试的请求包装
+  async _retryRequest(fn, name) {
+    let lastErr;
+    for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
+      try {
+        if (attempt > 0) {
+          const delay = this.retryDelay * attempt;
+          await new Promise(r => setTimeout(r, delay));
+        }
+        return await fn();
+      } catch (e) {
+        lastErr = e;
+        if (!this._shouldRetry(e, attempt)) throw e;
+      }
+    }
+    throw lastErr || new Error(`${name} 重试耗尽 / retries exhausted`);
   }
 
   async chat(messages, tools = null, signal = null) {
@@ -49,7 +102,10 @@ class LLMClient {
       body.tool_choice = "auto";
     }
 
-    const result = await this._request("/chat/completions", JSON.stringify(body), signal);
+    const result = await this._retryRequest(
+      () => this._request("/chat/completions", JSON.stringify(body), signal),
+      "chat"
+    );
     this._accumulateUsage(result.usage);
     return result;
   }
@@ -70,7 +126,10 @@ class LLMClient {
       body.tool_choice = "auto";
     }
 
-    return this._requestStream("/chat/completions", JSON.stringify(body), onToken, signal);
+    return this._retryRequest(
+      () => this._requestStream("/chat/completions", JSON.stringify(body), onToken, signal),
+      "chatStream"
+    );
   }
 
   _accumulateUsage(usage) {

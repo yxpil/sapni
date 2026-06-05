@@ -25,7 +25,7 @@ const SAPNI_CONFIG = path.join(SAPNI_DIR, "config.json");
 const PKG_CONFIG = path.join(__dirname, "..", "config.json");
 const LOGO_PATH = path.join(__dirname, "..", "Logos", "StartLogo.txt");
 
-const VER = "1.1.9";
+const VER = "1.1.17";
 
 function ensureDir() { if (!fs.existsSync(SAPNI_DIR)) fs.mkdirSync(SAPNI_DIR, { recursive: true }); }
 function loadConfig() {
@@ -289,6 +289,9 @@ const COMMANDS = [
   { cmd: "/trust", desc: "信任工具 / Trust: on(会话级) / off / status / all / <name>" },
   { cmd: "/untrust", desc: "取消信任 / Untrust" },
   { cmd: "/update", desc: "更新到最新版 / Update to latest" },
+  { cmd: "/retry", desc: "重试设置 / Retry config" },
+  { cmd: "/network", desc: "网络检测 / Network check" },
+  { cmd: "/histoken", desc: "历史token统计 / Token history" },
   { cmd: "/llm", desc: "查看 LLM 配置 / LLM config" },
   { cmd: "/llm key", desc: "设置 API Key" },
   { cmd: "/llm url", desc: "设置 API 地址 / Set URL" },
@@ -307,8 +310,60 @@ function App() {
   const [tools, setTools] = useState([]);
   const [toolsCollapsed, setToolsCollapsed] = useState(false);
   const [ctxPct, setCtxPct] = useState(0);
+  const [tokenUsage, setTokenUsage] = useState({ prompt: 0, completion: 0 }); // 本会话
+  const [toolActive, setToolActive] = useState(false);
+  const [progress, setProgress] = useState({ active: false, pct: 0, label: "", remaining: 0 });
+  const progressRef = useRef(null); // 进度条定时器
+  const PROGRESS_TIMEOUT = 30; // 默认30s倒计时
+
+  const startProgress = useCallback((label, timeoutSec = PROGRESS_TIMEOUT) => {
+    if (progressRef.current) clearInterval(progressRef.current);
+    const start = Date.now();
+    const total = timeoutSec * 1000;
+    setProgress({ active: true, pct: 0, label, remaining: timeoutSec });
+    progressRef.current = setInterval(() => {
+      const elapsed = Date.now() - start;
+      const pct = Math.min(100, Math.round((elapsed / total) * 100));
+      const remaining = Math.max(0, Math.ceil((total - elapsed) / 1000));
+      setProgress({ active: true, pct, label, remaining });
+      if (pct >= 100) {
+        clearInterval(progressRef.current);
+        progressRef.current = null;
+        setProgress({ active: false, pct: 0, label: "", remaining: 0 });
+      }
+    }, 250);
+  }, []);
+
+  const stopProgress = useCallback(() => {
+    if (progressRef.current) { clearInterval(progressRef.current); progressRef.current = null; }
+    setProgress({ active: false, pct: 0, label: "", remaining: 0 });
+  }, []);
+
+  const statusBlink = useRef(0);
+  // 状态块闪烁: 多状态并行时交替
+  useEffect(() => {
+    const t = setInterval(() => { statusBlink.current = (statusBlink.current + 1) % 4; }, 600);
+    return () => clearInterval(t);
+  }, []);
+  
+  const statusBlock = useMemo(() => {
+    const degraded = Tools.getDegraded();
+    const active = [];
+    if (degraded && degraded.length > 0) active.push("red");
+    if (thinking) active.push("blue");
+    if (toolActive) active.push("green");
+    if (!active.length) return { char: "\u25a1", color: "#6e7681", label: "idle" };
+    if (active.length === 1) {
+      const c = active[0];
+      return { char: "\u25a0", color: c === "red" ? "#f85149" : c === "green" ? "#3fb950" : "#58a6ff", label: c };
+    }
+    const pick = active[statusBlink.current % active.length];
+    return { char: "\u25a0", color: pick === "red" ? "#f85149" : pick === "green" ? "#3fb950" : "#58a6ff", label: active.join("+") };
+  }, [thinking, toolActive]);
   const [blocked, setBlocked] = useState(false);
   const [slashIdx, setSlashIdx] = useState(0);
+  const [slashScroll, setSlashScroll] = useState(0); // 菜单滚动偏移
+  const SLASH_PAGE = 8; // 每页显示条数
   const [mascotFace, setMascotFace] = useState(kao.mascotForFrame());
   const [promptFace, setPromptFace] = useState(kao.promptFace(""));
   const queueRef = useRef([]);
@@ -399,6 +454,8 @@ function App() {
           setStreaming(buf.replace(/\*\*(.+?)\*\*/g, "$1"));
         },
         onToolCall: (name, args = {}) => {
+          setToolActive(true);
+          startProgress("工具: " + name, 30);
           const short = Object.entries(args).map(([k, v]) => {
             const s = String(v);
             return k + "=" + (s.length > 50 ? s.slice(0, 50) + "\u2026" : s);
@@ -413,8 +470,11 @@ function App() {
             t.result = String(result || "").slice(0, 500);
           }
           setTools([...toolMap.values()]);
+          // all tools done?
+          if ([...toolMap.values()].every(x => x.status === "done")) { setToolActive(false); stopProgress(); }
         },
         onContextPct: (pct) => setCtxPct(pct),
+        onUsage: (u) => setTokenUsage({ prompt: u.prompt, completion: u.completion }),
         onThinking: (text, iter) => {
           setThinkingText(text);
           setThinkingIter(iter);
@@ -444,6 +504,8 @@ function App() {
     if (buf) addMsg("assistant", formatMd(buf, cols - 4));
     setStreaming("");
     setThinking(false);
+    setToolActive(false);
+    stopProgress();
     setToolsCollapsed(true);
     abortRef.current = null;
     
@@ -532,11 +594,36 @@ function App() {
         "/update        更新 / Update",
       ], cols));
     }
-    else if (cmd === "exit") process.exit(0);
+    else if (cmd === "exit") {
+      // 保存累计 token
+      try {
+        const histFile = path.join(SAPNI_DIR, "history-tokens.json");
+        let hist = { prompt: 0, completion: 0, sessions: 0 };
+        try { if (fs.existsSync(histFile)) hist = JSON.parse(fs.readFileSync(histFile, "utf-8")); } catch (_) {}
+        const cur = getAgent().llm.getUsage();
+        hist.prompt = (hist.prompt || 0) + (cur.prompt || 0);
+        hist.completion = (hist.completion || 0) + (cur.completion || 0);
+        hist.sessions = (hist.sessions || 0) + 1;
+        fs.writeFileSync(histFile, JSON.stringify(hist), "utf-8");
+      } catch (_) {}
+      process.exit(0);
+    }
     else if (cmd === "reset") {
       const a = getAgent();
+      // 先保存累计
+      try {
+        const histFile = path.join(SAPNI_DIR, "history-tokens.json");
+        let hist = { prompt: 0, completion: 0, sessions: 0 };
+        try { if (fs.existsSync(histFile)) hist = JSON.parse(fs.readFileSync(histFile, "utf-8")); } catch (_) {}
+        const cur = a.llm.getUsage();
+        hist.prompt = (hist.prompt || 0) + (cur.prompt || 0);
+        hist.completion = (hist.completion || 0) + (cur.completion || 0);
+        hist.sessions = (hist.sessions || 0) + 1;
+        fs.writeFileSync(histFile, JSON.stringify(hist), "utf-8");
+      } catch (_) {}
       endSession(a.sessionId);
       a.reset();
+      setTokenUsage({ prompt: 0, completion: 0 });
       a.sessionId = startSession();
       setMsgs([{ role: "system", content: "对话已重置，新会话已创建。" }]);
       setCtxPct(0);
@@ -925,6 +1012,65 @@ function App() {
         say("✅ 更新完成! / Update complete!\n" + out.split("\n").slice(-3).join("\n") + "\n请重启 Sapni 生效 / Please restart Sapni");
       });
     }
+    else if (cmd === "retry") {
+      if (!CONFIG.llm) CONFIG.llm = {};
+      const sub = rest.split(/\s+/)[0]?.toLowerCase();
+      const val = rest.slice(sub ? sub.length : 0).trim();
+      if (sub === "max" || sub === "次数") {
+        const n = parseInt(val);
+        if (isNaN(n) || n < 1 || n > 40) { say("重试次数: 1-40 / Retries: 1-40"); return; }
+        CONFIG.llm.maxRetries = n; saveConfig(CONFIG);
+        say(drawBoxTitle("✓ 最大重试 / Max retries: " + n, cols));
+      } else if (sub === "delay" || sub === "间隔") {
+        const n = parseInt(val);
+        if (isNaN(n) || n < 200 || n > 30000) { say("间隔: 200-30000ms / Delay: 200-30000ms"); return; }
+        CONFIG.llm.retryDelay = n; saveConfig(CONFIG);
+        say(drawBoxTitle("✓ 重试间隔 / Retry delay: " + n + "ms", cols));
+      } else {
+        const max = CONFIG.llm.maxRetries ?? 3;
+        const delay = CONFIG.llm.retryDelay ?? 1500;
+        say(drawBox([
+          "重试配置 / Retry Config",
+          "最大次数 / Max:  " + max + " (范围 1-40)",
+          "间隔延迟 / Delay: " + delay + "ms (范围 200-30000)",
+          "",
+          "  /retry max 10     设置重试次数",
+          "  /retry delay 2000 设置间隔2秒",
+        ], cols));
+      }
+    }
+    else if (cmd === "network") {
+      say("检测中... / Checking...");
+      const a = getAgent();
+      const llm = a.llm;
+      llm.checkNetwork().then((ok) => {
+        if (ok) {
+          say(drawBoxTitle("✓ 网络正常 / Network OK", cols) + "\n  " + CONFIG.llm.baseURL);
+        } else {
+          say(drawBoxTitle("✗ 网络不可达 / Network unreachable", cols) + "\n  检查: " + CONFIG.llm.baseURL + "\n  /retry 可增加重试次数");
+        }
+      }).catch((e) => {
+        say("检测失败: " + e.message);
+      });
+    }
+    else if (cmd === "histoken") {
+      // 累计历史 token: ~/.sapni/history-tokens.json
+      const histFile = path.join(SAPNI_DIR, "history-tokens.json");
+      let hist = { prompt: 0, completion: 0, sessions: 0 };
+      try {
+        if (fs.existsSync(histFile)) hist = JSON.parse(fs.readFileSync(histFile, "utf-8"));
+      } catch (_) {}
+      // 加上当前会话
+      const cur = getAgent().llm.getUsage();
+      const totalP = (hist.prompt || 0) + (cur.prompt || 0);
+      const totalC = (hist.completion || 0) + (cur.completion || 0);
+      say(drawBox([
+        "Token 统计 / Token Stats",
+        "本次会话 / Session:  ▲" + (cur.prompt || 0).toLocaleString() + " ▼" + (cur.completion || 0).toLocaleString(),
+        "历史累计 / History:   ▲" + totalP.toLocaleString() + " ▼" + totalC.toLocaleString(),
+        "会话数   / Sessions:  " + ((hist.sessions || 0) + 1),
+      ], cols));
+    }
     else if (cmd === "provider" || cmd === "preset") {
       const choice = parseInt(rest.trim(), 10);
       
@@ -1062,10 +1208,9 @@ function App() {
 
   useInput((inputVal, key) => {
     if (key.escape) {
-      // ESC: 中断AI → 清空输入 → 无操作（不移除退出功能）
       if (abortRef.current) {
         abortRef.current.abort();
-        queueRef.current = []; // 清空队列
+        queueRef.current = [];
         setQueueLen(0);
         return;
       }
@@ -1073,8 +1218,28 @@ function App() {
       return;
     }
     if (!slashInput || !slashFiltered.length) return;
-    if (key.upArrow) setSlashIdx((slashClamped - 1 + slashFiltered.length) % slashFiltered.length);
-    if (key.downArrow || key.tab) setSlashIdx((slashClamped + 1) % slashFiltered.length);
+    if (key.upArrow) {
+      const next = (slashClamped - 1 + slashFiltered.length) % slashFiltered.length;
+      setSlashIdx(next);
+      // 自动滚动：保持在可视区内
+      if (next < slashScroll) setSlashScroll(next);
+      if (next >= slashScroll + SLASH_PAGE) setSlashScroll(next - SLASH_PAGE + 1);
+    }
+    if (key.downArrow || key.tab) {
+      const next = (slashClamped + 1) % slashFiltered.length;
+      setSlashIdx(next);
+      if (next < slashScroll) setSlashScroll(next);
+      if (next >= slashScroll + SLASH_PAGE) setSlashScroll(next - SLASH_PAGE + 1);
+    }
+    // 鼠标滚轮: mouseDown/mouseUp events
+    if (key.mouseDown) {
+      setSlashScroll(Math.min(slashFiltered.length - SLASH_PAGE, Math.max(0, slashScroll + 3)));
+      setSlashIdx(Math.min(slashIdx + 3, slashFiltered.length - 1));
+    }
+    if (key.mouseUp) {
+      setSlashScroll(Math.max(0, slashScroll - 3));
+      setSlashIdx(Math.max(0, slashIdx - 3));
+    }
   });
 
   return (
@@ -1112,6 +1277,30 @@ function App() {
             <Box marginTop={1}>
               <Text color="#30363d">{"─".repeat(Math.max(0, cols - 7))}</Text>
             </Box>
+            {/* 信任提醒 + 降级工具警告 */}
+            {(() => {
+              const trust = Tools.getTrustStatus();
+              const degraded = Tools.getDegraded();
+              if (trust.level === "none" || degraded.length > 0) {
+                const warnings = [];
+                if (trust.level === "none") {
+                  warnings.push("⚠ 未信任任何工具 / No tools trusted — 每次调用需确认, 性能降级");
+                  warnings.push("  使用 /trust on 开启会话信任 或 /trust all 永久信任");
+                }
+                if (degraded.length > 0) {
+                  warnings.push("🔴 已熔断工具 / Degraded: " + degraded.join(", "));
+                  warnings.push("  这些工具上次出错, 仍可用但建议检查");
+                }
+                return (
+                  <Box marginTop={1}>
+                    {warnings.map((w, i) => (
+                      <Text key={i} color={i === 0 && trust.level === "none" ? "#d29922" : "#f85149"}>{w}</Text>
+                    ))}
+                  </Box>
+                );
+              }
+              return null;
+            })()}
             <Box marginTop={1}>
               <Text color="#58a6ff" bold>路径 / Paths</Text>
               {(() => {
@@ -1217,8 +1406,12 @@ function App() {
           borderStyle="round"
           borderColor="#30363d"
         >
-          {slashFiltered.map((c, i) => {
-            const sel = i === slashClamped;
+          {slashScroll > 0 && (
+            <Box paddingLeft={1}><Text color="#6e7681">  ▲ {slashScroll} more above</Text></Box>
+          )}
+          {slashFiltered.slice(slashScroll, slashScroll + SLASH_PAGE).map((c, i) => {
+            const realIdx = slashScroll + i;
+            const sel = realIdx === slashClamped;
             return (
               <Box key={c.cmd} flexDirection="row" paddingLeft={1}>
                 <Text color={sel ? "cyanBright" : "gray"}>{sel ? "▸ " : "  "}</Text>
@@ -1227,8 +1420,11 @@ function App() {
               </Box>
             );
           })}
+          {slashFiltered.length > slashScroll + SLASH_PAGE && (
+            <Box paddingLeft={1}><Text color="#6e7681">  ▼ {slashFiltered.length - slashScroll - SLASH_PAGE} more below</Text></Box>
+          )}
           <Box paddingLeft={1}>
-            <Text color="cyan" dimColor>  ↑↓ Navigate · Enter Select</Text>
+            <Text color="cyan" dimColor>  ↑↓ Navigate · Enter Select · 🖱 Scroll</Text>
           </Box>
         </Box>
       )}
@@ -1238,15 +1434,60 @@ function App() {
         {/* StatusBar - simplified */}
         <Box bg="#161b22" paddingX={2} paddingY={1}>
           <Text>
+            <Text color={statusBlock.color}>{statusBlock.char}</Text>
+            <Text color="#6e7681"> </Text>
             <Text color="#f783ac">{mascotFace}</Text>
             <Text color="#6e7681"> </Text>
             <Text color="#c9d1d9">{CONFIG.llm.model}</Text>
             <Text color="#484f58"> · </Text>
             <Text color="#58a6ff">msg {msgs.length}</Text>
-            <Text color="#484f58"> · </Text>
-            <Text color={ctxPct > 90 ? "#f85149" : ctxPct > 80 ? "#d29922" : "#3fb950"}>ctx {Math.round(ctxPct)}%</Text>
+            {(tokenUsage.prompt > 0 || tokenUsage.completion > 0) && (<>
+              <Text color="#484f58"> · </Text>
+              <Text color="#3fb950">▲{tokenUsage.prompt.toLocaleString()}</Text>
+              <Text color="#484f58"> </Text>
+              <Text color="#f85149">▼{tokenUsage.completion.toLocaleString()}</Text>
+            </>)}
           </Text>
         </Box>
+
+        {/* Token 容量进度条 / Context capacity bar */}
+        <Box bg="#161b22" paddingX={2} paddingY={1} flexDirection="column">
+          <Box flexDirection="row">
+            <Text color="#8b949e">上下文 / Context:</Text>
+            <Text color="#f783ac" bold> {Math.round(ctxPct)}%</Text>
+            <Text color="#484f58"> · </Text>
+            <Text color="#c9d1d9">▲{tokenUsage.prompt.toLocaleString()}</Text>
+            <Text color="#484f58"> </Text>
+            <Text color="#c9d1d9">▼{tokenUsage.completion.toLocaleString()}</Text>
+          </Box>
+          <Box flexDirection="row" marginTop={0}>
+            {(() => {
+              const pct = Math.round(ctxPct);
+              const barW = Math.min(40, Math.max(8, cols - 10));
+              const filled = Math.max(0, Math.round(pct / 100 * barW));
+              const empty = barW - filled;
+              return (<>
+                <Text color="#0d1117" backgroundColor="#f783ac">{" ".repeat(filled)}</Text>
+                <Text color="#0d1117" backgroundColor="#c9d1d9">{" ".repeat(empty)}</Text>
+              </>);
+            })()}
+          </Box>
+        </Box>
+
+        {/* 进度条 / Progress bar */}
+        {progress.active && (
+          <Box bg="#161b22" paddingX={2} paddingY={0} flexDirection="column">
+            <Box flexDirection="row">
+              <Text color="#58a6ff">{progress.label}</Text>
+              <Text color="#6e7681">  ⏳ {progress.remaining}s</Text>
+            </Box>
+            <Box flexDirection="row">
+              <Text color="#0d1117" backgroundColor="#f783ac">{" ".repeat(Math.round(progress.pct / 5))}</Text>
+              <Text color="#0d1117" backgroundColor="#c9d1d9">{" ".repeat(20 - Math.round(progress.pct / 5))}</Text>
+              <Text color="#8b949e"> {progress.pct}%</Text>
+            </Box>
+          </Box>
+        )}
 
         {queueLen > 0 && (
           <Box bg="#161b22" paddingX={2} paddingBottom={1}>
@@ -1307,6 +1548,19 @@ const { waitUntilExit } = render(<App />);
 process.on("uncaughtException", (e) => {
   console.error("Sapni 崩溃:", e.message);
   try {
+    // 保存累计 token
+    const histFile = path.join(SAPNI_DIR, "history-tokens.json");
+    try {
+      let hist = { prompt: 0, completion: 0, sessions: 0 };
+      try { if (fs.existsSync(histFile)) hist = JSON.parse(fs.readFileSync(histFile, "utf-8")); } catch (_) {}
+      if (_agent && _agent.llm) {
+        const cur = _agent.llm.getUsage();
+        hist.prompt = (hist.prompt || 0) + (cur.prompt || 0);
+        hist.completion = (hist.completion || 0) + (cur.completion || 0);
+        hist.sessions = (hist.sessions || 0) + 1;
+        fs.writeFileSync(histFile, JSON.stringify(hist), "utf-8");
+      }
+    } catch (_) {}
     const https = require("https");
     const body = JSON.stringify({ message: "Sapni 崩溃: " + e.message + "\n" + (e.stack || "").slice(0, 200), version: "1.1.5-4" });
     const req = https.request("https://sapni.yxpil.com/api/feedback", { method: "POST", headers: { "Content-Type": "application/json" }, timeout: 5000 });
