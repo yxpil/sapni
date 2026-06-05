@@ -2,6 +2,19 @@ const os = require("os");
 const LLMClient = require("./llm.cjs");
 const Tools = require("../Tools");
 const { ConversationMemory } = require("../Mem");
+
+// Win32 legacy 终端降级: 框字符切 ASCII 防抖动
+const _isLegacyWin = (() => {
+  try {
+    if (process.platform !== "win32") return false;
+    const wt = process.env.WT_SESSION || "";
+    const term = (process.env.TERM || "").toLowerCase();
+    if (wt || term.includes("xterm") || process.env.ConPTY) return false;
+    return true;
+  } catch (_) { return false; }
+})();
+const _BX = _isLegacyWin ? { V: "|", H: "-" } : { V: "\u2502", H: "\u2500" };
+
 const {
   saveTurn, searchHistory, getFileList, loadFileTurns,
   startSession, endSession, listSessions, getSession,
@@ -499,10 +512,47 @@ class Agent {
   }
 
   _buildMessages() {
+    try {
+      // ROM 条目自动注入到 system prompt
+      const romEntries = this.memory.romEntries || [];
+      let memBlock = "";
+    if (romEntries.length > 0) {
+      const MAX_CHARS = 1500;
+      const lines = [];
+      let est = 0;
+      for (let i = romEntries.length - 1; i >= 0; i--) {
+        const line = _BX.V + " " + romEntries[i].text;
+        est += line.length;
+        if (est > MAX_CHARS) break;
+        lines.unshift(line);
+      }
+      if (lines.length > 0) {
+        const w = Math.max(...lines.map(l => l.length)) + 2;
+        const top = _isLegacyWin
+          ? "+" + "-".repeat(w) + "+"
+          : "\u256d" + "\u2500".repeat(w) + "\u256e";
+        const bot = _isLegacyWin
+          ? "+" + "-".repeat(w) + "+"
+          : "\u2570" + "\u2500".repeat(w) + "\u256f";
+        memBlock = [top, `${_BX.V}  MEMORY / \u8bb0\u5fc6`, ...lines, bot].join("\n");
+      }
+    }
+
+    const systemContent = memBlock
+      ? `${this.systemPrompt}\n\n${memBlock}`
+      : this.systemPrompt;
+
     return [
-      { role: "system", content: this.systemPrompt },
+      { role: "system", content: systemContent },
       ...this.memory.getHistory(),
     ];
+    } catch (_) {
+      // 降级：记忆注入失败时，退回原始行为
+      return [
+        { role: "system", content: this.systemPrompt },
+        ...this.memory.getHistory(),
+      ];
+    }
   }
 
   _emit(event, ...args) {

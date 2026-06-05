@@ -25,7 +25,7 @@ const SAPNI_CONFIG = path.join(SAPNI_DIR, "config.json");
 const PKG_CONFIG = path.join(__dirname, "..", "config.json");
 const LOGO_PATH = path.join(__dirname, "..", "Logos", "StartLogo.txt");
 
-const VER = "1.1.8";
+const VER = "1.1.9";
 
 function ensureDir() { if (!fs.existsSync(SAPNI_DIR)) fs.mkdirSync(SAPNI_DIR, { recursive: true }); }
 function loadConfig() {
@@ -86,6 +86,73 @@ function termLen(s) {
 function padTerm(s, n) {
   const d = n - termLen(s);
   return s + (d > 0 ? " ".repeat(d) : "");
+}
+
+// ── 统一绘图框 (Unicode box-drawing, 自适应宽度, Win32 降级) ──────────
+const _isLegacyWin = (() => {
+  try {
+    if (process.platform !== "win32") return false;
+    // Windows 10+ ConPTY 支持 VT/Unicode, 旧版 cmd/powershell 不支持
+    const wt = process.env.WT_SESSION || "";
+    const term = (process.env.TERM || "").toLowerCase();
+    const conpty = process.env.ConPTY || "";
+    if (wt || term.includes("xterm") || conpty) return false;
+    return true;
+  } catch (_) { return false; }
+})();
+
+const BOX = _isLegacyWin
+  ? { TL: "+", TR: "+", BL: "+", BR: "+", H: "-", V: "|" }
+  : { TL: "\u256d", TR: "\u256e", BL: "\u2570", BR: "\u256f", H: "\u2500", V: "\u2502" };
+
+function drawBox(lines, maxW) {
+  try {
+    const w = Math.min(maxW || 80, 80);
+    const innerW = w - 4;
+    const top = `${BOX.TL}${BOX.H.repeat(w - 2)}${BOX.TR}`;
+    const body = (lines || []).map((l) => {
+      try {
+        const clean = String(l);
+        const pad = Math.max(0, innerW - termLen(clean));
+        return `${BOX.V}  ${clean}${" ".repeat(pad)}${BOX.V}`;
+      } catch (_) { return `${BOX.V}  (err)${" ".repeat(innerW - 6)}${BOX.V}`; }
+    });
+    const bot = `${BOX.BL}${BOX.H.repeat(w - 2)}${BOX.BR}`;
+    return [top, ...body, bot].join("\n");
+  } catch (_) { return (lines || []).join("\n"); }
+}
+
+function drawBoxTitle(title, maxW) {
+  return drawBox([title], maxW);
+}
+
+// ── 显示 Sapni 扩展路径 ──────────
+function expandPaths() {
+  try {
+    const pkgDir = path.resolve(__dirname, "..");
+  const memDir = path.join(SAPNI_DIR, "mem");
+  const histDir = path.join(SAPNI_DIR, "history");
+  const customToolsDir = path.join(SAPNI_DIR, "Tools", "custom");
+  const apiTokens = path.join(SAPNI_DIR, "api_tokens.json");
+  const skillsDir = path.join(pkgDir, "Skills");
+  const logosDir = path.join(pkgDir, "Logos");
+  const bin = path.join(os.homedir(), ".npm-global", "bin", "sapni");
+
+  const entries = [
+    { label: "包目录 / Package",  path: pkgDir },
+    { label: "用户配置 / Config",  path: SAPNI_CONFIG },
+    { label: "记忆存储 / Memory",  path: memDir },
+    { label: "历史会话 / History", path: histDir },
+  ];
+
+  entries.push({ label: "自定义工具 / Tools", path: customToolsDir });
+  entries.push({ label: "API令牌 / Tokens", path: apiTokens });
+  entries.push({ label: "内置技能 / Skills", path: skillsDir });
+  entries.push({ label: "Logo资源 / Logos", path: logosDir });
+  entries.push({ label: "启动入口 / Binary", path: bin });
+
+  return { entries };
+  } catch (_) { return { entries: [{ label: "路径解析失败 / Path error", path: String(SAPNI_DIR) }] }; }
 }
 
 function formatMd(text, maxW) {
@@ -433,39 +500,37 @@ function App() {
     const say = (t) => addMsg("system", t);
 
     if (v === "/help") {
-      say([
-        "\u256d\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500",
-        "\u2502  Sapni \u5e2e\u52a9 / Sapni Help              \u2502",
-        "\u2502  /help          \u5e2e\u52a9 / Help              \u2502",
-        "\u2502  /exit          \u9000\u51fa / Exit              \u2502",
-        "\u2502  /reset         \u91cd\u7f6e / Reset             \u2502",
-        "\u2502  /clear         \u6e05\u7a7a / Clear             \u2502",
-        "\u2502  /version       \u7248\u672c / Version           \u2502",
-        "\u2502  /status        \u72b6\u6001 / Status            \u2502",
-        "\u2502  /ctx           \u4e0a\u4e0b\u6587 / Context        \u2502",
-        "\u2502  /tools         \u5de5\u5177 / Tools              \u2502",
-        "\u2502  /tools_more    \u5168\u90e8\u5de5\u5177 / All tools \u2502",
-        "\u2502  /tool_search   \u641c\u7d22\u5de5\u5177 / Search    \u2502",
-        "\u2502  /temp          \u6e29\u5ea6 / Temp               \u2502",
-        "\u2502  /topp          TopP                              \u2502",
-        "\u2502  /token         \u6700\u5927 tokens / Max tokens  \u2502",
-        "\u2502  /memory        \u8bb0\u5fc6 / Memory             \u2502",
-        "\u2502  /memory_list   \u5217\u51fa / List               \u2502",
-        "\u2502  /memory_search \u641c\u7d22 / Search             \u2502",
-        "\u2502  /memory_del    \u5220\u9664 / Delete             \u2502",
-        "\u2502  /memory_clear  \u6e05\u7a7a / Clear             \u2502",
-        "\u2502  /compress      \u538b\u7f29 / Compress           \u2502",
-        "\u2502  /history       \u5386\u53f2 / History            \u2502",
-        "\u2502  /sessions      \u4f1a\u8bdd / Sessions           \u2502",
-        "\u2502  /session       \u67e5\u770b / View               \u2502",
-        "\u2502  /provider      \u5207\u6362\u63d0\u4f9b\u5546 / Provider         \u2502",
-        "│  /persona       身份设定 / Persona   │",
-        "│  /llm           LLM 配置 / LLM config      │",
-        "│  /sp_server     API 服务 / Server          │",
-        "│  /trusted       信任管理 / Trust    │",
-        "│  /update        更新 / Update            │",
-        "╰───────────────────────────────────────",
-      ].join("\n"));
+      say(drawBox([
+        "Sapni 帮助 / Sapni Help",
+        "/help          帮助 / Help",
+        "/exit          退出 / Exit",
+        "/reset         重置 / Reset",
+        "/clear         清空 / Clear",
+        "/version       版本 / Version",
+        "/status        状态 / Status",
+        "/ctx           上下文 / Context",
+        "/tools         工具 / Tools",
+        "/tools_more    全部工具 / All tools",
+        "/tool_search   搜索工具 / Search",
+        "/temp          温度 / Temp",
+        "/topp          TopP",
+        "/token         最大 tokens / Max tokens",
+        "/memory        记忆 / Memory",
+        "/memory_list   列出 / List",
+        "/memory_search 搜索 / Search",
+        "/memory_del    删除 / Delete",
+        "/memory_clear  清空 / Clear",
+        "/compress      压缩 / Compress",
+        "/history       历史 / History",
+        "/sessions      会话 / Sessions",
+        "/session       查看 / View",
+        "/provider      切换提供商 / Provider",
+        "/persona       身份设定 / Persona",
+        "/llm           LLM 配置 / LLM config",
+        "/sp_server     API 服务 / Server",
+        "/trusted       信任管理 / Trust",
+        "/update        更新 / Update",
+      ], cols));
     }
     else if (cmd === "exit") process.exit(0);
     else if (cmd === "reset") {
@@ -490,15 +555,13 @@ function App() {
       const mem = a.memory.stats();
       const pct = a.estimateContextPct();
       const names = Tools.listToolNames();
-      say([
-        "\u256d\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500",
-        "  模型: " + CONFIG.llm.model + "  温度: " + CONFIG.llm.temperature,
-        "  Token: 输入 " + usage.prompt + " · 输出 " + usage.completion,
-        "  上下文: " + pct + "% (上限 " + a.getMaxContextTokens() + " tokens)",
-        "  记忆: ROM" + (mem.romEntries || mem.entries) + " RAM" + (mem.ramEntries || 0) + " · 历史 " + mem.historyMessages + " 轮",
-        "  工具: " + names.length + " 个 — " + names.slice(0, 8).join(", ") + (names.length > 8 ? " ..." : ""),
-        "\u2570\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500",
-      ].join("\n"));
+      say(drawBox([
+        "模型: " + CONFIG.llm.model + "  温度: " + CONFIG.llm.temperature,
+        "Token: 输入 " + usage.prompt + " · 输出 " + usage.completion,
+        "上下文: " + pct + "% (上限 " + a.getMaxContextTokens() + " tokens)",
+        "记忆: ROM" + (mem.romEntries || mem.entries) + " RAM" + (mem.ramEntries || 0) + " · 历史 " + mem.historyMessages + " 轮",
+        "工具: " + names.length + " 个 — " + names.slice(0, 8).join(", ") + (names.length > 8 ? " ..." : ""),
+      ], cols));
     }
     else if (cmd === "ctx") {
       const a = getAgent();
@@ -577,7 +640,18 @@ function App() {
     else if (cmd === "tool_list_saved") {
       const saved = Tools.listCustomTools();
       if (!saved.length) { say("(无已保存工具 / No saved tools)"); return; }
-      say(saved.map((s) => "[" + s.file + "] exports: " + s.exports.join(", ")).join("\n"));
+      const lines = [];
+      for (const s of saved) {
+        lines.push("[" + s.file + "]");
+        if (s.tools.length === 0) {
+          lines.push("  (无工具导出 / no tool exports)");
+        } else {
+          for (const t of s.tools) {
+            lines.push("  " + t.name + (t.desc ? "  —  " + t.desc : ""));
+          }
+        }
+      }
+      say(lines.join("\n"));
     }
     else if (cmd === "tool_del_saved") {
       if (!rest) { say("用法: /tool_del_saved <名称> / Usage: /tool_del_saved <name>"); return; }
@@ -642,11 +716,7 @@ function App() {
           const port = parseInt(subRest) || defaultPort;
           try {
             await server.startServer(port);
-            say([
-              "╭──────────────────────────────────────────╮",
-              "│  Sapni API Server Started                │",
-              "╰──────────────────────────────────────────╯",
-              "",
+            say(drawBoxTitle("Sapni API Server Started", cols) + "\n\n" + [
               "URL: http://localhost:" + port,
               "",
               "Endpoints:",
@@ -670,11 +740,7 @@ function App() {
           // Default: show status
           const running = server.isServerRunning();
           const tokens = server.getTokens();
-          say([
-            "╭──────────────────────────────────────────╮",
-            "│  Sapni API Server Status                 │",
-            "╰──────────────────────────────────────────╯",
-            "",
+          say(drawBoxTitle("Sapni API Server Status", cols) + "\n\n" + [
             "Status: " + (running ? "🟢 Running" : "🔴 Stopped"),
             "Port: " + (CONFIG.api?.port || 27262),
             "Tokens: " + tokens.length,
@@ -689,11 +755,7 @@ function App() {
     else if (cmd === "sp_token") {
       import("./api/server.js").then((server) => {
         const token = server.generateToken(rest || "API Token");
-        say([
-          "╭──────────────────────────────────────╮",
-          "│  New API Token Created               │",
-          "╰──────────────────────────────────────╯",
-          "",
+        say(drawBoxTitle("New API Token Created", cols) + "\n\n" + [
           "Token:       " + token.token,
           "ID:          " + token.id,
           "Description: " + token.description,
@@ -708,11 +770,7 @@ function App() {
       import("./api/server.js").then((server) => {
         const tokens = server.getTokens();
         if (!tokens.length) { 
-          say([
-            "╭──────────────────────────────────────╮",
-            "│  No API Tokens                       │",
-            "╰──────────────────────────────────────╯",
-            "",
+          say(drawBoxTitle("No API Tokens", cols) + "\n\n" + [
             "Use /sp_token to create one.",
           ].join("\n"));
           return;
@@ -726,40 +784,24 @@ function App() {
           "    Last Used: " + (t.lastUsed?.slice(0, 19) || "Never"),
           "    Usage: " + t.usageCount + " times",
         ].join("\n"));
-        say([
-          "╭──────────────────────────────────────╮",
-          "│  API Tokens (" + tokens.length + ")                  │",
-          "╰──────────────────────────────────────╯",
-          "",
+        say(drawBox(["API Tokens (" + tokens.length + ")"], cols) + "\n\n" + [
           ...lines,
         ].join("\n"));
       });
     }
     else if (cmd === "sp_token_del") {
       if (!rest) { 
-        say([
-          "╭──────────────────────────────────────╮",
-          "│  Usage: /sp_token_del <token_id>     │",
-          "╰──────────────────────────────────────╯",
-        ].join("\n"));
+        say(drawBoxTitle("Usage: /sp_token_del <token_id>", cols));
         return;
       }
       import("./api/server.js").then((server) => {
         const deleted = server.deleteToken(rest);
         if (deleted) {
-          say([
-            "╭──────────────────────────────────────╮",
-            "│  Token Deleted                       │",
-            "╰──────────────────────────────────────╯",
-            "",
+          say(drawBoxTitle("Token Deleted", cols) + "\n\n" + [
             "Token: " + deleted.token,
           ].join("\n"));
         } else {
-          say([
-            "╭──────────────────────────────────────╮",
-            "│  Token Not Found                     │",
-            "╰──────────────────────────────────────╯",
-          ].join("\n"));
+          say(drawBoxTitle("Token Not Found", cols));
         }
       });
     }
@@ -888,11 +930,7 @@ function App() {
       
       // 无参数: 显示提供商列表
       if (!choice || choice < 1 || choice > presets.PRESETS.length) {
-        say([
-          "╭──────────────────────────────────────────╮",
-          "│  AI 提供商 / AI Provider                  │",
-          "╰──────────────────────────────────────────╯",
-          "",
+        say(drawBoxTitle("AI 提供商 / AI Provider", cols) + "\n\n" + [
           presets.PRESETS.map((p, i) => {
             return [
               `  ${String(i + 1).padEnd(3)} ${p.name}`,
@@ -913,11 +951,7 @@ function App() {
       const result = presets.applyPreset(CONFIG, idx, 0);
       if (result.error) { say(result.error); return; }
       saveConfig(CONFIG);
-      say([
-        "╭──────────────────────────────────────────╮",
-        `│  ✓ 已切换 / Switched                      │`,
-        "╰──────────────────────────────────────────╯",
-        "",
+      say(drawBoxTitle("✓ 已切换 / Switched", cols) + "\n\n" + [
         `  提供商: ${p.name}`,
         `  模型:   ${CONFIG.llm.model}`,
         `  URL:    ${CONFIG.llm.baseURL}`,
@@ -934,11 +968,7 @@ function App() {
       const text = raw.toLowerCase();
       if (!raw || raw === "show") {
         if (CONFIG.persona) {
-          say([
-            "╭──────────────────────────────────────────╮",
-            "│  当前身份 / Current Persona               │",
-            "╰──────────────────────────────────────────╯",
-            "",
+          say(drawBoxTitle("当前身份 / Current Persona", cols) + "\n\n" + [
             "  " + CONFIG.persona,
             "",
             "子命令 / Subcommands:",
@@ -948,11 +978,7 @@ function App() {
             "  /persona off       关闭身份 / Disable",
           ].join("\n"));
         } else {
-          say([
-            "╭──────────────────────────────────────────╮",
-            "│  无自定义身份 / No Custom Persona         │",
-            "╰──────────────────────────────────────────╯",
-            "",
+          say(drawBoxTitle("无自定义身份 / No Custom Persona", cols) + "\n\n" + [
             "  当前使用默认系统提示。",
             "",
             "子命令 / Subcommands:",
@@ -962,18 +988,10 @@ function App() {
         }
       } else if (text === "reset" || text === "default" || text === "off") {
         delete CONFIG.persona; saveConfig(CONFIG);
-        say([
-          "╭──────────────────────────────────────────╮",
-          "│  ✓ 身份已重置为默认 / Identity reset      │",
-          "╰──────────────────────────────────────────╯",
-        ].join("\n"));
+        say(drawBoxTitle("✓ 身份已重置为默认 / Identity reset", cols));
       } else {
         CONFIG.persona = raw; saveConfig(CONFIG);
-        say([
-          "╭──────────────────────────────────────────╮",
-          "│  ✓ 身份已更新 / Identity updated          │",
-          "╰──────────────────────────────────────────╯",
-          "",
+        say(drawBoxTitle("✓ 身份已更新 / Identity updated", cols) + "\n\n" + [
           "  " + raw,
         ].join("\n"));
       }
@@ -996,11 +1014,7 @@ function App() {
         say("模型已更新: " + CONFIG.llm.model);
       } else {
         const masked = CONFIG.llm.apiKey ? CONFIG.llm.apiKey.slice(0, 8) + "..." + CONFIG.llm.apiKey.slice(-4) : "(not set)";
-        say([
-          "╭──────────────────────────────────────────╮",
-          "│  LLM Configuration                       │",
-          "╰──────────────────────────────────────────╯",
-          "",
+        say(drawBoxTitle("LLM Configuration", cols) + "\n\n" + [
           "提供商: " + CONFIG.llm.provider,
           "API Key:  " + masked,
           "API URL:  " + CONFIG.llm.baseURL,
@@ -1067,37 +1081,86 @@ function App() {
     <Box flexDirection="column" paddingLeft={1}>
       {!started ? (
         <Box flexDirection="column" flexShrink={0}>
-          {/* Auto-wrap layout: logo left, info right, wraps on narrow terminals */}
+          {/* Auto-wrap layout: logo left, info right, paths below — one frame */}
           <Box 
-            flexDirection="row" 
-            flexWrap="wrap" 
-            alignItems="center"
+            flexDirection="column"
             borderStyle="round" 
             borderColor="cyan"
             paddingX={2}
             paddingY={1}
             bg="#1a1a2e"
           >
-            <Box flexDirection="column" paddingRight={4}>
-              {LOGO_LINES.map((line, i) => (
-                <Text key={i} color="magentaBright">{line}</Text>
-              ))}
-              <Text color="green">{CONFIG.llm.model} · {(CONFIG.llm.contextWindow || 1048576).toLocaleString()} tokens</Text>
-              {updateMsg && (
-                <Text color="yellow">{updateMsg.split("\n")[0]}</Text>
-              )}
+            <Box flexDirection="row" flexWrap="wrap" alignItems="center">
+              <Box flexDirection="column" paddingRight={4}>
+                {LOGO_LINES.map((line, i) => (
+                  <Text key={i} color="magentaBright">{line}</Text>
+                ))}
+                <Text color="green">{CONFIG.llm.model} · {(CONFIG.llm.contextWindow || 1048576).toLocaleString()} tokens</Text>
+                {updateMsg && (
+                  <Text color="yellow">{updateMsg.split("\n")[0]}</Text>
+                )}
+              </Box>
+              <Box flexGrow={1} flexShrink={1} flexDirection="column" paddingX={3} minWidth={40}>
+                <Text color="cyanBright" bold>Sapni v{VER}</Text>
+                <Text color="cyan" dimColor>自进化 AI · 终端助手 / Self-Evolving AI · Terminal Agent</Text>
+                <Text>{"\n"}</Text>
+                <Text color="white">终端原生 AI 编程助手 / Terminal-native AI coding assistant</Text>
+                <Text>{"\n"}</Text>
+                <Text color="gray">/ 命令菜单 · ↑↓ 选择 · Enter 确认 / command menu · select · confirm</Text>
+              </Box>
             </Box>
-            <Box flexGrow={1} flexShrink={1} flexDirection="column" paddingX={3} minWidth={40}>
-              <Text color="cyanBright" bold>Sapni v{VER}</Text>
-              <Text color="cyan" dimColor>自进化 AI · 终端助手 / Self-Evolving AI · Terminal Agent</Text>
-              <Text>{"\n"}</Text>
-              <Text color="white">终端原生 AI 编程助手 / Terminal-native AI coding assistant</Text>
-              <Text>{"\n"}</Text>
-              <Text color="gray">/ 命令菜单 · ↑↓ 选择 · Enter 确认 / command menu · select · confirm</Text>
+            <Box marginTop={1}>
+              <Text color="#30363d">{"─".repeat(Math.max(0, cols - 7))}</Text>
             </Box>
-          </Box>
-          <Box marginTop={1}>
-            <Text color="gray" dimColor>{"─".repeat(cols - 2)}</Text>
+            <Box marginTop={1}>
+              <Text color="#58a6ff" bold>路径 / Paths</Text>
+              {(() => {
+                const p = expandPaths();
+                const avail = Math.max(20, (cols || 80) - 8);
+                const wrapPath = (label, val) => {
+                  const head = `  ${label}: ${val}`;
+                  const w = termLen(head);
+                  if (w <= avail) return [head];
+                  // 折行：label 单独一行，路径下一行缩进
+                  return [
+                    `  ${label}:`,
+                    `    ${val}`,
+                  ];
+                };
+                const lines = [];
+                for (const e of p.entries) {
+                  lines.push(...wrapPath(e.label, e.path));
+                  // 自定义工具：列出安装的工具
+                  if (e.label === "自定义工具 / Tools") {
+                    try {
+                      const saved = Tools.listCustomTools();
+                      if (!saved.length) {
+                        lines.push("    (无 / none)");
+                      } else {
+                        for (const s of saved) {
+                          if (!s.tools || s.tools.length === 0) {
+                            lines.push(`    [${s.file}] (无工具导出)`);
+                          } else {
+                            for (const t of s.tools) {
+                              const toolLine = `    ${t.name}${t.desc ? "  —  " + t.desc : ""}`;
+                              if (termLen(toolLine) <= avail) {
+                                lines.push(toolLine);
+                              } else {
+                                lines.push(`    ${t.name}:`);
+                                if (t.desc) lines.push(`      ${t.desc}`);
+                              }
+                            }
+                          }
+                        }
+                      }
+                    } catch (_) {}
+                  }
+                }
+                return (
+                  <Text color="#c9d1d9">{lines.join("\n")}</Text>
+                );
+              })()}
+            </Box>
           </Box>
         </Box>
       ) : (

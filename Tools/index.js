@@ -87,13 +87,27 @@ function deleteToolFile(name) {
 function listCustomTools() {
   if (!fs.existsSync(CUSTOM_DIR)) return [];
   const files = fs.readdirSync(CUSTOM_DIR).filter((f) => f.endsWith(".js"));
-  return files.map((f) => {
+  const result = [];
+  for (const f of files) {
     const name = f.replace(/\.js$/, "");
     const p = path.join(CUSTOM_DIR, f);
-    let keys = [];
-    try { keys = Object.keys(require(p)); } catch (_) {}
-    return { file: f, name, exports: keys };
-  });
+    let mod = null;
+    try { mod = require(p); } catch (_) {}
+    const tools = [];
+    if (mod && typeof mod === "object") {
+      for (const [key, val] of Object.entries(mod)) {
+        if (val && typeof val === "object" && typeof val.name === "string") {
+          tools.push({
+            key,
+            name: val.name,
+            desc: val.description || "",
+          });
+        }
+      }
+    }
+    result.push({ file: f, name, tools });
+  }
+  return result;
 }
 
 function setPermissionCallback(cb) { permissionCallback = cb; }
