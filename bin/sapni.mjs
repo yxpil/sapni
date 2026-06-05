@@ -22,7 +22,7 @@ if (!process.execArgv.some(a => a.includes("tsx"))) {
   const result = spawnSync(
     process.execPath,
     ["--import", pathToFileURL(tsxPath).href, __filename, ...process.argv.slice(2)],
-    { stdio: "inherit" }
+    { stdio: "inherit", windowsHide: true }
   );
   process.exit(result.status ?? 1);
 }

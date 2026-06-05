@@ -74,6 +74,11 @@ class ConversationMemory {
     this._trimHistory();
   }
 
+  addSystemMessage(content) {
+    this.history.push({ role: "system", content });
+    this._trimHistory();
+  }
+
   getHistory() {
     return [...this.history];
   }
@@ -219,4 +224,6 @@ class ConversationMemory {
   }
 }
 
-module.exports = { ConversationMemory };
+const { FiveLayerMemory } = require("./memory-v2");
+
+module.exports = { ConversationMemory, FiveLayerMemory };

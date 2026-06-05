@@ -5,6 +5,7 @@ const { spawn } = require("child_process");
 const Agent = require("./agent");
 const Tools = require("../Tools");
 const presets = require("./presets.cjs");
+const { checkUpdate, isDevMode } = require("./utils/update.cjs");
 const { listRecentTurns, searchHistory, getFileList, loadFileTurns, listSessions, getSession, loadSessionTurns, globalSearch, endSession, startSession } = require("../Mem/history");
 
 const C = {
@@ -360,6 +361,8 @@ function showHelp() {
     ["/api key <KEY>", "设置 API Key"],
     ["/api url <URL>", "设置 API 地址"],
     ["/api model <MODEL>", "设置模型名称"], ["/version", "显示版本号"],
+    ["/mcp", "查看 MCP 服务连接状态"],
+    ["/restore", "恢复上次崩溃前的对话"],
   ];
   for (const [cmd, desc] of cmds) {
     console.log(`  ${C.yellow + cmd.padEnd(22) + C.reset} ${desc}`);
@@ -429,6 +432,18 @@ function buildAgent() {
       }, seconds * 1000);
     },
   });
+  // 异步初始化 MCP，不阻塞启动
+  initializeMCP();
+}
+
+async function initializeMCP() {
+  try {
+    if (agent && agent.initializeMCP) {
+      await agent.initializeMCP();
+    }
+  } catch (e) {
+    console.warn(`  ${C.yellow}[Sapni] MCP initialization failed: ${e.message}${C.reset}`);
+  }
 }
 
 async function handleSlashCommand(input) {
@@ -535,7 +550,7 @@ async function handleSlashCommand(input) {
       break;
     }
     case "version": {
-      console.log(`${C.bold + C.cyan}${config.agent.name}${C.reset} v${config.agent.version || "1.1.8"}`);
+      console.log(`${C.bold + C.cyan}${config.agent.name}${C.reset} v${config.agent.version || "1.1.21"}`);
       break;
     }
     case "persona":
@@ -892,6 +907,11 @@ async function handleSlashCommand(input) {
       break;
     }
     case "update": {
+      if (isDevMode()) {
+        console.log(`${C.magenta}⚡ 开发预览模式 — 禁止更新${C.reset}`);
+        console.log(`  当前版本高于 NPM 已发布版本，更新会覆盖开发代码。`);
+        break;
+      }
       console.log(`${C.cyan}正在更新...${C.reset}`);
       const { exec } = require("child_process");
       exec("npm install -g sapni-ai@latest", { timeout: 60000 }, (err, stdout, stderr) => {
@@ -928,6 +948,46 @@ async function handleSlashCommand(input) {
       const result = Tools.deleteToolFile(rest);
       if (result.startsWith("[OK]")) agent.refreshTools();
       console.log((result.startsWith("[OK]") ? C.green : C.yellow) + result + C.reset);
+      break;
+    }
+    case "restore": {
+      if (!Agent.hasCheckpoint()) {
+        console.log(`  ${C.yellow}(无可用恢复文件)${C.reset}`);
+        break;
+      }
+      const info = agent.restoreFromCheckpoint();
+      if (!info) {
+        console.log(`  ${C.red}恢复失败${C.reset}`);
+        break;
+      }
+      const d = new Date(info.time).toLocaleString();
+      console.log(div("="));
+      console.log(`  ${C.green}✓ 对话已恢复${C.reset}`);
+      console.log(`  模型: ${info.model || "?"}  |  消息: ${info.messageCount} 条`);
+      console.log(`  记录时间: ${d}`);
+      console.log(div("="));
+      agent._clearCheckpoint();
+      break;
+    }
+    case "mcp": {
+      const mcpStatus = agent.getMCPStatus();
+      console.log(div("="));
+      console.log(`  ${C.bold}MCP 服务状态${C.reset}`);
+      if (mcpStatus.enabled) {
+        console.log(`  已启用  |  类型: ${mcpStatus.clientType || "-"}`);
+        if (mcpStatus.url) console.log(`  路径: ${mcpStatus.url}`);
+        if (mcpStatus.mode) console.log(`  传输: ${mcpStatus.mode}`);
+        if (mcpStatus.source) console.log(`  来源: ${mcpStatus.source}`);
+        console.log(`  工具: ${mcpStatus.toolCount} 个`);
+        if (mcpStatus.tools && mcpStatus.tools.length > 0) {
+          for (const t of mcpStatus.tools) {
+            console.log(`    ${C.cyan}${t.name}${C.reset}  ${C.dim}${t.description || ""}${C.reset}`);
+          }
+        }
+      } else {
+        console.log(`  ${C.yellow}未启用${C.reset}  |  在配置中设置 mcp.enabled = true`);
+      }
+      console.log(div("="));
       break;
     }
     case "status": showStatus(); break;
@@ -1139,28 +1199,33 @@ async function handleInput(line) {
 async function main() {
   if (process.argv.includes("--version") || process.argv.includes("-v")) {
     loadConfig();
-    console.log(config.agent.version || "1.1.8");
+    console.log(config.agent.version || "1.1.21");
     process.exit(0);
   }
 
   loadConfig();
   showLogo();
 
-  // 启动时检查 npm 最新版本
-  const { exec } = require("child_process");
-  exec("npm view sapni-ai version", { timeout: 10000 }, (err, stdout) => {
-    if (!err) {
-      const latest = stdout.trim();
-      const ver = config.agent.version || "1.1.8";
-      if (latest && latest !== ver) {
-        console.log(`  ${C.yellow}⬆${C.reset} 新版本可用: ${C.cyan}${latest}${C.reset} (当前 ${ver})`);
-        console.log(`     更新: ${C.dim}npm install -g sapni-ai@latest${C.reset}`);
-        console.log(div("="));
-      }
+  // 启动时异步检查更新（不阻塞）
+  checkUpdate().then((info) => {
+    if (info.needsUpdate) {
+      console.log(`  ${C.yellow}⬆${C.reset} 新版本可用: ${C.cyan}${info.latest}${C.reset} (当前 ${info.current})`);
+      console.log(`     更新: ${C.dim}npm install -g sapni-ai@latest${C.reset}`);
+      console.log(div("="));
+    } else if (info.isDev) {
+      console.log(`  ${C.magenta}⚡ 开发预览模式${C.reset} — 当前 ${C.cyan}${info.current}${C.reset} > NPM ${C.dim}${info.latest}${C.reset}`);
+      console.log(div("="));
     }
-  });
+  }).catch(() => {});
 
   buildAgent();
+
+  // 检查崩溃恢复文件
+  if (Agent.hasCheckpoint()) {
+    console.log(`  ${C.yellow}⚠ 检测到上次异常退出的对话记录${C.reset}`);
+    console.log(`  ${C.cyan}/restore${C.reset} 可恢复上次对话`);
+    console.log(div("="));
+  }
 
   if (!config.llm.apiKey || config.llm.apiKey.startsWith("YOUR_")) {
     console.log(`  ${C.yellow}⚠ 未配置 API Key${C.reset}`);
@@ -1201,7 +1266,7 @@ async function main() {
   });
 
   const mw = maxWidth();
-  console.log(`\n  ${C.bold + C.cyan}${config.agent.name}${C.reset} v${config.agent.version || "1.1.8"}  ${C.dim}DeepSeek驱动 | 最大宽度: ${mw}列${C.reset}`);
+  console.log(`\n  ${C.bold + C.cyan}${config.agent.name}${C.reset} v${config.agent.version || "1.1.21"}  ${C.dim}DeepSeek驱动 | 最大宽度: ${mw}列${C.reset}`);
   console.log(`  ${C.dim}输入 ${C.yellow}/help${C.dim} 查看命令  |  输入 ${C.yellow}/${C.dim} 弹出命令菜单${C.reset}`);
   console.log(div("="));
 

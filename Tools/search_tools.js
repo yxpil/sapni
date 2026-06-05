@@ -20,6 +20,7 @@ const execConsoleTool = {
         encoding: "utf-8",
         timeout: timeout || 30000,
         maxBuffer: 2 * 1024 * 1024,
+        windowsHide: true,
       });
       const ms = Date.now() - start;
       const out = output || "(无输出)";
@@ -56,6 +57,7 @@ const waitCommandTool = {
       const child = spawn(command, argList, {
         cwd: cwdPath,
         shell: true,
+        windowsHide: true,
       });
       let stdout = "";
       let stderr = "";

@@ -1,2 +1,5 @@
 @echo off
-node --import tsx "%~dp0\..\Src\index.jsx" %*
+setlocal
+set DIR=%~dp0
+node "%DIR%sapni.mjs" %*
+endlocal

@@ -1,6 +1,6 @@
 # Sapni（栖梦）— 自进化AI编程助手
 [网址](https://sapni.yxpil.com)
-> v1.1.0-rc1 · Self-Evolving AI · Terminal Agent · OpenAI Compatible API Server · Windows/macOS/Linux
+> v1.1.21 · Self-Evolving AI · Terminal Agent · OpenAI Compatible API Server · Windows/macOS/Linux
 
 ```
 ███████╗ █████╗ ██████╗ ███╗   ██╗██╗
@@ -531,6 +531,62 @@ curl -X POST http://localhost:27262/api/v1/tools/execute \
 
 ---
 
-## 📄 许可证
+##  v1.1.21 更新日志
+
+### 新增功能
+
+**MCP (Model Context Protocol) 支持**
+- 通用 MCP 客户端：自动发现并接入任何符合 MCP 协议的服务，支持 HTTP 和 stdio 传输
+- 内置 CodeGraph MCP 服务：代码语义搜索、符号定义查找、引用追踪、影响分析等 8 个代码分析工具
+- 自动发现：环境变量、配置文件 `~/.sapni/mcp.json`、DNS-SD、本地 npm 包多源发现
+- `/mcp` 命令：查看当前 MCP 服务连接状态、已加载工具列表
+
+**Goal 目标管理系统**
+- `set_goal` — 设定当前会话目标，支持优先级 (low/medium/high)
+- `update_goal` — 更新进度百分比或描述
+- `add_sub_goal` / `complete_sub_goal` — 子任务分解与追踪，自动计算总进度
+- `get_goal` / `get_goal_history` — 查看当前目标详情和历史
+- `clear_goal` — 清除目标并自动存档
+
+**5层记忆系统 (Hermes-style)**
+- **工作记忆** (Working Memory)：当前对话上下文
+- **短期记忆** (Short-term Memory)：最近几次会话摘要
+- **情景记忆** (Episodic Memory)：事件、经历、特定时间点的事实
+- **语义记忆** (Semantic Memory)：知识、事实、概念（带置信度评分，高置信度条目优先保留）
+- **程序记忆** (Procedural Memory)：技能、流程、操作步骤（按使用频率排序）
+- 相关工具：`add_episodic_memory`、`add_semantic_memory`、`add_procedural_memory`、`search_memory_layers`、`search_semantic_memory`、`search_procedural_memory`、`memory_stats`
+- 各层独立容量管理，智能淘汰策略
+
+**崩溃恢复 / Crash Recovery**
+- 每 5 轮工具调用自动保存检查点到 `~/.sapni/recovery/last-session.json`
+- 正常完成对话后也保存
+- 启动时自动检测 30 分钟内的有效检查点，提示 `/restore` 恢复
+- 恢复内容：对话消息、记忆条目 (RAM/ROM)、5层记忆、目标状态、persona
+- `reset` 时自动清除检查点
+
+### 优化改进
+
+**错误上报增强**
+- 崩溃上报附带完整上下文：最近 8 条对话、模型信息、OS/Node 版本、Agent 状态 (token 用量/记忆统计)
+- 工具执行异常自动上报详细信息（工具名、参数、stack trace）
+- `submit_feedback` 自动附加上下文
+- 全局 `uncaughtException` / `unhandledRejection` 统一上报
+
+**工具调用稳定性**
+- `tool_calls.function.name` 类型安全防护：自动将非字符串名称转换为字符串，防止 API 序列化错误
+- 解析文本工具调用时增加安全包装，拒绝异常长的名称
+- `addMsg` 防御性字符串转换，防止对象泄漏到 React 渲染层
+
+**性能降级提示优化**
+- 不支持结构化工具调用的模型自动切换到文本解析模式
+- 状态栏实时显示"性能降级"标识
+
+**其他**
+- `/help` 命令内容更新，补齐新增命令
+- 所有错误处理点统一加固
+
+---
+
+# 📜  许可证
 
 Apache-2.0

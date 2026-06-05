@@ -1,3 +1,4 @@
+const http = require("http");
 const https = require("https");
 
 class LLMClient {
@@ -5,6 +6,7 @@ class LLMClient {
     this.apiKey = config.apiKey;
     this.baseURL = config.baseURL.endsWith('/') ? config.baseURL : config.baseURL + '/';
     this.model = config.model;
+    this.provider = config.provider;
     this.maxTokens = config.maxTokens;
     this.temperature = config.temperature;
     this.topP = config.topP;
@@ -14,6 +16,17 @@ class LLMClient {
     this.maxRetries = config.maxRetries ?? 3;
     this.retryDelay = config.retryDelay ?? 1500;
     this._networkOk = true; // 网络状态缓存
+    this._supportsTools = null; // null: 未检测, true: 支持, false: 不支持
+  }
+
+  // 获取工具支持状态
+  supportsTools() {
+    return this._supportsTools !== false;
+  }
+
+  // 是否已检测过工具支持
+  hasToolSupportInfo() {
+    return this._supportsTools !== null;
   }
 
   // 快速网络检测: DNS 解析 API 主机
@@ -76,6 +89,8 @@ class LLMClient {
       try {
         if (attempt > 0) {
           const delay = this.retryDelay * attempt;
+          // 输出重试信息
+          console.warn(`[Sapni] 重试 ${attempt}/${this.maxRetries} - 等待 ${delay}ms...`);
           await new Promise(r => setTimeout(r, delay));
         }
         return await fn();
@@ -84,7 +99,7 @@ class LLMClient {
         if (!this._shouldRetry(e, attempt)) throw e;
       }
     }
-    throw lastErr || new Error(`${name} 重试耗尽 / retries exhausted`);
+    throw lastErr || new Error(`${name} 重试耗尽 / retries exhausted (共 ${this.maxRetries} 次)`);
   }
 
   async chat(messages, tools = null, signal = null) {
@@ -97,20 +112,35 @@ class LLMClient {
       stream: false,
     };
 
-    if (tools && tools.length > 0) {
+    if (tools && tools.length > 0 && this._supportsTools !== false) {
       body.tools = tools;
       body.tool_choice = "auto";
     }
 
-    const result = await this._retryRequest(
-      () => this._request("/chat/completions", JSON.stringify(body), signal),
-      "chat"
-    );
+    let result;
+    try {
+      result = await this._retryRequest(
+        () => this._request("/chat/completions", JSON.stringify(body), signal),
+        "chat"
+      );
+    } catch (err) {
+      if (err.message && err.message.includes("does not support tools")) {
+        this._supportsTools = false;
+        delete body.tools;
+        delete body.tool_choice;
+        result = await this._retryRequest(
+          () => this._request("/chat/completions", JSON.stringify(body), signal),
+          "chat"
+        );
+      } else {
+        throw err;
+      }
+    }
     this._accumulateUsage(result.usage);
     return result;
   }
 
-  async chatStream(messages, onToken, tools = null, signal = null) {
+  async chatStream(messages, onToken, tools = null, signal = null, onUsage = null) {
     const body = {
       model: this.model,
       messages,
@@ -121,15 +151,33 @@ class LLMClient {
       stream_options: { include_usage: true },
     };
 
-    if (tools && tools.length > 0) {
+    if (tools && tools.length > 0 && this._supportsTools !== false) {
       body.tools = tools;
       body.tool_choice = "auto";
     }
 
-    return this._retryRequest(
-      () => this._requestStream("/chat/completions", JSON.stringify(body), onToken, signal),
-      "chatStream"
-    );
+    try {
+      return await this._retryRequest(
+        () => this._requestStream("/chat/completions", JSON.stringify(body), onToken, signal, onUsage),
+        "chatStream"
+      );
+    } catch (err) {
+      if (err.message && err.message.includes("does not support tools")) {
+        this._supportsTools = false;
+        // 抛出特殊错误让 agent 捕获并显示通知
+        const degradeErr = new Error("MODEL_DOES_NOT_SUPPORT_TOOLS");
+        degradeErr.retryWithoutTools = (retryOnUsage = null) => {
+          delete body.tools;
+          delete body.tool_choice;
+          return this._retryRequest(
+            () => this._requestStream("/chat/completions", JSON.stringify(body), onToken, signal, retryOnUsage || onUsage),
+            "chatStream"
+          );
+        };
+        throw degradeErr;
+      }
+      throw err;
+    }
   }
 
   _accumulateUsage(usage) {
@@ -140,10 +188,12 @@ class LLMClient {
 
   _request(path, body, signal = null) {
     const url = new URL("chat/completions", this.baseURL);
+    const isHttps = url.protocol === "https:";
+    const protocol = isHttps ? https : http;
 
     const options = {
       hostname: url.hostname,
-      port: url.port || 443,
+      port: url.port || (isHttps ? 443 : 80),
       path: url.pathname,
       method: "POST",
       headers: {
@@ -154,7 +204,7 @@ class LLMClient {
     if (signal) options.signal = signal;
 
     return new Promise((resolve, reject) => {
-      const req = https.request(options, (res) => {
+      const req = protocol.request(options, (res) => {
         let data = "";
         res.on("data", (chunk) => (data += chunk));
         res.on("end", () => {
@@ -179,18 +229,35 @@ class LLMClient {
         });
       });
 
-      req.on("error", reject);
+      req.on("error", (err) => {
+        const url = new URL(this.baseURL);
+        let friendlyMsg = err.message;
+        if (err.code === "ECONNREFUSED") {
+          friendlyMsg = `[ECONNREFUSED] 服务不可达 - ${url.hostname}:${url.port || (isHttps ? 443 : 80)} 未响应，请检查服务是否已启动`;
+        } else if (err.code === "ETIMEDOUT") {
+          friendlyMsg = `[ETIMEDOUT] 请求超时 - 连接到 ${url.hostname} 超时，请检查网络或稍后重试`;
+        } else if (err.code === "ENOTFOUND") {
+          friendlyMsg = `[ENOTFOUND] DNS解析失败 - 无法解析 ${url.hostname}，请检查网络连接`;
+        } else if (err.code === "ECONNRESET") {
+          friendlyMsg = `[ECONNRESET] 连接被重置 - 服务器意外断开连接，请重试`;
+        } else if (err.code === "EAI_AGAIN") {
+          friendlyMsg = `[EAI_AGAIN] 网络不可用 - DNS查询失败，请检查网络连接`;
+        }
+        reject(new Error(friendlyMsg));
+      });
       req.write(body);
       req.end();
     });
   }
 
-  _requestStream(path, body, onToken, signal = null) {
+  _requestStream(path, body, onToken, signal = null, onUsage = null) {
     const url = new URL("chat/completions", this.baseURL);
+    const isHttps = url.protocol === "https:";
+    const protocol = isHttps ? https : http;
 
     const options = {
       hostname: url.hostname,
-      port: url.port || 443,
+      port: url.port || (isHttps ? 443 : 80),
       path: url.pathname,
       method: "POST",
       headers: {
@@ -201,7 +268,7 @@ class LLMClient {
     if (signal) options.signal = signal;
 
     return new Promise((resolve, reject) => {
-      const req = https.request(options, (res) => {
+      const req = protocol.request(options, (res) => {
         if (res.statusCode === 401) {
           reject(new Error("API Key 无效或未设置 — 请用 /api key <你的Key> 设置"));
           return;
@@ -271,6 +338,12 @@ class LLMClient {
 
               if (json.usage) {
                 self._accumulateUsage(json.usage);
+                // 实时回调 token 用量
+                if (onUsage) {
+                  try {
+                    onUsage(self.getUsage());
+                  } catch (_) {}
+                }
               }
             } catch (_) {}
           }
@@ -288,10 +361,40 @@ class LLMClient {
           });
         });
 
-        res.on("error", reject);
+        res.on("error", (err) => {
+          const url = new URL(self.baseURL);
+          let friendlyMsg = err.message;
+          if (err.code === "ECONNREFUSED") {
+            friendlyMsg = `[ECONNREFUSED] 服务不可达 - ${url.hostname}:${url.port || (isHttps ? 443 : 80)} 未响应，请检查服务是否已启动`;
+          } else if (err.code === "ETIMEDOUT") {
+            friendlyMsg = `[ETIMEDOUT] 请求超时 - 连接到 ${url.hostname} 超时，请检查网络或稍后重试`;
+          } else if (err.code === "ENOTFOUND") {
+            friendlyMsg = `[ENOTFOUND] DNS解析失败 - 无法解析 ${url.hostname}，请检查网络连接`;
+          } else if (err.code === "ECONNRESET") {
+            friendlyMsg = `[ECONNRESET] 连接被重置 - 服务器意外断开连接，请重试`;
+          } else if (err.code === "EAI_AGAIN") {
+            friendlyMsg = `[EAI_AGAIN] 网络不可用 - DNS查询失败，请检查网络连接`;
+          }
+          reject(new Error(friendlyMsg));
+        });
       });
 
-      req.on("error", reject);
+      req.on("error", (err) => {
+        const url = new URL(self.baseURL);
+        let friendlyMsg = err.message;
+        if (err.code === "ECONNREFUSED") {
+          friendlyMsg = `[ECONNREFUSED] 服务不可达 - ${url.hostname}:${url.port || (isHttps ? 443 : 80)} 未响应，请检查服务是否已启动`;
+        } else if (err.code === "ETIMEDOUT") {
+          friendlyMsg = `[ETIMEDOUT] 请求超时 - 连接到 ${url.hostname} 超时，请检查网络或稍后重试`;
+        } else if (err.code === "ENOTFOUND") {
+          friendlyMsg = `[ENOTFOUND] DNS解析失败 - 无法解析 ${url.hostname}，请检查网络连接`;
+        } else if (err.code === "ECONNRESET") {
+          friendlyMsg = `[ECONNRESET] 连接被重置 - 服务器意外断开连接，请重试`;
+        } else if (err.code === "EAI_AGAIN") {
+          friendlyMsg = `[EAI_AGAIN] 网络不可用 - DNS查询失败，请检查网络连接`;
+        }
+        reject(new Error(friendlyMsg));
+      });
       req.write(body);
       req.end();
     });

@@ -204,7 +204,7 @@ const grepTool = {
       try { 
         // 跨平台检测命令
         const cmd = process.platform === "win32" ? "where rg" : "which rg";
-        return execSync(cmd, { encoding: "utf-8", timeout: 2000 }).trim(); 
+        return execSync(cmd, { encoding: "utf-8", timeout: 2000, windowsHide: true }).trim(); 
       }
       catch (_) { return null; }
     })();
@@ -277,7 +277,7 @@ const grepTool = {
     const ctxFlag = context && context > 0 ? ` -C ${context}` : "";
     try {
       const cmd = `grep -rn${icFlag}${ctxFlag}${globFilter} -m ${max} "${pattern.replace(/"/g, '\\"')}" "${root}"`;
-      const output = execSync(cmd, { cwd: root, encoding: "utf-8", timeout: 15000, maxBuffer: 2 * 1024 * 1024 });
+      const output = execSync(cmd, { cwd: root, encoding: "utf-8", timeout: 15000, maxBuffer: 2 * 1024 * 1024, windowsHide: true });
       const lines = output.trim().split("\n").slice(0, mode === "count" ? 9999 : max);
       if (lines.length === 0 || (lines.length === 1 && !lines[0])) return `[无匹配] "${pattern}" 在 ${root}`;
       return lines.join("\n");
@@ -552,7 +552,7 @@ const openPreviewTool = {
   },
   execute: async ({ url }) => {
     try {
-      execSync(`start "${url}"`, { shell: true, timeout: 3000 });
+      execSync(`start "${url}"`, { shell: true, timeout: 3000, windowsHide: true });
       return `[OK] 已在浏览器中打开 ${url}`;
     } catch (_) {
       return `[未打开] 无法启动浏览器, 请手动访问: ${url}`;
@@ -570,14 +570,14 @@ const getDiagnosticsTool = {
     try {
       // 跨平台命令：Windows 使用 cmd /c，避免 bash 语法
       const cmdTsc = process.platform === "win32" ? "cmd /c npx tsc --noEmit 2>&1" : "npx tsc --noEmit 2>&1";
-      const out = execSync(cmdTsc, { cwd, encoding: "utf-8", timeout: 30000, maxBuffer: 512 * 1024 });
+      const out = execSync(cmdTsc, { cwd, encoding: "utf-8", timeout: 30000, maxBuffer: 512 * 1024, windowsHide: true });
       const errors = out.trim().split("\n").filter((l) => l.includes("error TS"));
       if (errors.length > 0) results.push(`[TypeScript] ${errors.length} 个错误`);
       results.push(...errors.slice(0, 20));
     } catch (_) {}
     try {
       const cmdEslint = process.platform === "win32" ? "cmd /c npx eslint . --format compact 2>&1" : "npx eslint . --format compact 2>&1";
-      const out = execSync(cmdEslint, { cwd, encoding: "utf-8", timeout: 30000, maxBuffer: 512 * 1024 });
+      const out = execSync(cmdEslint, { cwd, encoding: "utf-8", timeout: 30000, maxBuffer: 512 * 1024, windowsHide: true });
       const warns = out.trim().split("\n").filter((l) => l.includes("warning") || l.includes("error"));
       if (warns.length > 0) results.push(`[ESLint] ${warns.length} 个问题`);
       results.push(...warns.slice(0, 10));
@@ -666,6 +666,142 @@ const restartSessionTool = {
   execute: () => { return "restart_session must be injected"; },
 };
 
+// ========== Goal 目标管理工具 ==========
+
+const setGoalTool = {
+  name: "set_goal",
+  description: "设置当前会话的主要目标/任务. 设置后会追踪进度, 支持子任务分解. 用于长对话任务管理",
+  parameters: {
+    goal: { type: "string", required: true, description: "目标描述" },
+    description: { type: "string", required: false, description: "目标详细描述" },
+    priority: { type: "string", required: false, description: "优先级: low/medium/high, 默认medium" },
+  },
+  execute: () => { return "set_goal must be injected"; },
+};
+
+const updateGoalTool = {
+  name: "update_goal",
+  description: "更新当前目标的进度或状态",
+  parameters: {
+    progress: { type: "number", required: false, description: "进度百分比(0-100)" },
+    description: { type: "string", required: false, description: "更新的描述" },
+  },
+  execute: () => { return "update_goal must be injected"; },
+};
+
+const addSubGoalTool = {
+  name: "add_sub_goal",
+  description: "为当前目标添加子任务",
+  parameters: {
+    subGoal: { type: "string", required: true, description: "子任务描述" },
+  },
+  execute: () => { return "add_sub_goal must be injected"; },
+};
+
+const completeSubGoalTool = {
+  name: "complete_sub_goal",
+  description: "标记子任务完成",
+  parameters: {
+    subGoalId: { type: "number", required: true, description: "子任务ID" },
+  },
+  execute: () => { return "complete_sub_goal must be injected"; },
+};
+
+const clearGoalTool = {
+  name: "clear_goal",
+  description: "清除当前目标(存档历史)",
+  parameters: {},
+  execute: () => { return "clear_goal must be injected"; },
+};
+
+const getGoalTool = {
+  name: "get_goal",
+  description: "获取当前目标状态和进度",
+  parameters: {},
+  execute: () => { return "get_goal must be injected"; },
+};
+
+const getGoalHistoryTool = {
+  name: "get_goal_history",
+  description: "获取历史目标记录",
+  parameters: {
+    limit: { type: "number", required: false, description: "返回数量限制, 默认10" },
+  },
+  execute: () => { return "get_goal_history must be injected"; },
+};
+
+// ========== 5层记忆系统工具 ==========
+
+const addEpisodicMemoryTool = {
+  name: "add_episodic_memory",
+  description: "添加情景记忆(事件、经历、特定时间点的事实)",
+  parameters: {
+    event: { type: "string", required: true, description: "事件描述" },
+    tags: { type: "string", required: false, description: "标签(逗号分隔)" },
+  },
+  execute: () => { return "add_episodic_memory must be injected"; },
+};
+
+const addSemanticMemoryTool = {
+  name: "add_semantic_memory",
+  description: "添加语义记忆(知识、事实、概念)",
+  parameters: {
+    fact: { type: "string", required: true, description: "事实内容" },
+    source: { type: "string", required: false, description: "来源" },
+    confidence: { type: "number", required: false, description: "置信度(0-1, 默认1.0)" },
+  },
+  execute: () => { return "add_semantic_memory must be injected"; },
+};
+
+const addProceduralMemoryTool = {
+  name: "add_procedural_memory",
+  description: "添加程序记忆(技能、流程、操作步骤)",
+  parameters: {
+    skillName: { type: "string", required: true, description: "技能名称" },
+    steps: { type: "string", required: true, description: "步骤(JSON数组, 如 '[\"步骤1\",\"步骤2\"]')" },
+    description: { type: "string", required: false, description: "技能描述" },
+    tags: { type: "string", required: false, description: "标签(逗号分隔)" },
+  },
+  execute: () => { return "add_procedural_memory must be injected"; },
+};
+
+const searchMemoryLayersTool = {
+  name: "search_memory_layers",
+  description: "搜索所有记忆层(短期/情景/语义/程序记忆)",
+  parameters: {
+    query: { type: "string", required: true, description: "搜索关键词" },
+    limit: { type: "number", required: false, description: "结果数量, 默认5" },
+  },
+  execute: () => { return "search_memory_layers must be injected"; },
+};
+
+const searchSemanticMemoryTool = {
+  name: "search_semantic_memory",
+  description: "搜索语义记忆(知识/事实)",
+  parameters: {
+    query: { type: "string", required: true, description: "搜索关键词" },
+    limit: { type: "number", required: false, description: "结果数量, 默认5" },
+  },
+  execute: () => { return "search_semantic_memory must be injected"; },
+};
+
+const searchProceduralMemoryTool = {
+  name: "search_procedural_memory",
+  description: "搜索程序记忆(技能/流程)",
+  parameters: {
+    query: { type: "string", required: true, description: "搜索关键词" },
+    limit: { type: "number", required: false, description: "结果数量, 默认5" },
+  },
+  execute: () => { return "search_procedural_memory must be injected"; },
+};
+
+const memoryStatsTool = {
+  name: "memory_stats",
+  description: "获取5层记忆系统的统计信息",
+  parameters: {},
+  execute: () => { return "memory_stats must be injected"; },
+};
+
 module.exports = {
   todo_write: todoWriteTool,
   search_replace: searchReplaceTool,
@@ -682,4 +818,22 @@ module.exports = {
   skill: skillTool,
   forget_conversation: forgetConversationTool,
   restart_session: restartSessionTool,
+  
+  // Goal 目标管理
+  set_goal: setGoalTool,
+  update_goal: updateGoalTool,
+  add_sub_goal: addSubGoalTool,
+  complete_sub_goal: completeSubGoalTool,
+  clear_goal: clearGoalTool,
+  get_goal: getGoalTool,
+  get_goal_history: getGoalHistoryTool,
+  
+  // 5层记忆系统
+  add_episodic_memory: addEpisodicMemoryTool,
+  add_semantic_memory: addSemanticMemoryTool,
+  add_procedural_memory: addProceduralMemoryTool,
+  search_memory_layers: searchMemoryLayersTool,
+  search_semantic_memory: searchSemanticMemoryTool,
+  search_procedural_memory: searchProceduralMemoryTool,
+  memory_stats: memoryStatsTool,
 };

@@ -22,6 +22,7 @@ function syntaxCheck(filePath) {
         execSync(`node --check ${JSON.stringify(filePath)}`, {
           encoding: "utf-8",
           timeout: 10000,
+          windowsHide: true,
           stdio: "pipe",
         });
         return null;
@@ -34,6 +35,7 @@ function syntaxCheck(filePath) {
         const tsconfig = findUp("tsconfig.json", dir);
         if (tsconfig) {
           execSync(`npx tsc --noEmit --pretty false 2>&1 | grep ${JSON.stringify(path.basename(filePath))} || true`, {
+            windowsHide: true,
             encoding: "utf-8",
             timeout: 30000,
             cwd: path.dirname(tsconfig),
@@ -46,6 +48,7 @@ function syntaxCheck(filePath) {
 
       case ".py": {
         execSync(`python3 -m py_compile ${JSON.stringify(filePath)}`, {
+          windowsHide: true,
           encoding: "utf-8",
           timeout: 10000,
           stdio: "pipe",
