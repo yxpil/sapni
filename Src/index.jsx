@@ -25,7 +25,7 @@ const SAPNI_CONFIG = path.join(SAPNI_DIR, "config.json");
 const PKG_CONFIG = path.join(__dirname, "..", "config.json");
 const LOGO_PATH = path.join(__dirname, "..", "Logos", "StartLogo.txt");
 
-const VER = "1.1.17";
+const VER = "1.1.19";
 
 function ensureDir() { if (!fs.existsSync(SAPNI_DIR)) fs.mkdirSync(SAPNI_DIR, { recursive: true }); }
 function loadConfig() {
@@ -124,6 +124,24 @@ function drawBox(lines, maxW) {
 
 function drawBoxTitle(title, maxW) {
   return drawBox([title], maxW);
+}
+
+// ── Token 快捷输入: 32k → 32768, 1m → 1048576 ──────────
+function parseToken(s) {
+  const v = String(s).toLowerCase().trim();
+  const m = v.match(/^(\d+(?:\.\d+)?)\s*(k|m|g)?$/);
+  if (!m) return parseInt(v) || 0;
+  const n = parseFloat(m[1]);
+  if (m[2] === "k") return Math.round(n * 1024);
+  if (m[2] === "m") return Math.round(n * 1048576);
+  if (m[2] === "g") return Math.round(n * 1073741824);
+  return Math.round(n);
+}
+function formatToken(n) {
+  if (n >= 1073741824) return (n / 1073741824).toFixed(1) + "G";
+  if (n >= 1048576) return (n / 1048576).toFixed(1) + "M";
+  if (n >= 1024) return Math.round(n / 1024) + "K";
+  return String(n);
 }
 
 // ── 显示 Sapni 扩展路径 ──────────
@@ -1158,6 +1176,14 @@ function App() {
         if (!val) { say("用法: /llm model <模型名> / Usage: /llm model <name>"); return; }
         CONFIG.llm.model = val; saveConfig(CONFIG);
         say("模型已更新: " + CONFIG.llm.model);
+      } else if (sub === "ctx" || sub === "context") {
+        if (!val) { say("用法: /llm ctx <32k|64k|128k|1m|200000> / Usage: /llm ctx <value>"); return; }
+        const parsed = parseToken(val);
+        if (!parsed) { say("格式: 32k, 64k, 128k, 1m, 200000 / Format: 32k, 64k, 128k, 1m, 200000"); return; }
+        CONFIG.llm.contextWindow = parsed; saveConfig(CONFIG);
+        getAgent().actualContextWindow = parsed;
+        getAgent().maxContextTokens = Math.floor(parsed * 0.8);
+        say(drawBoxTitle("✓ 上下文 / Context: " + formatToken(parsed), cols));
       } else {
         const masked = CONFIG.llm.apiKey ? CONFIG.llm.apiKey.slice(0, 8) + "..." + CONFIG.llm.apiKey.slice(-4) : "(not set)";
         say(drawBoxTitle("LLM Configuration", cols) + "\n\n" + [
@@ -1301,42 +1327,39 @@ function App() {
               }
               return null;
             })()}
-            <Box marginTop={1}>
-              <Text color="#58a6ff" bold>路径 / Paths</Text>
+            <Box marginTop={1} flexDirection="column">
+              <Text color="#f783ac" bold>  路径 / Paths</Text>
               {(() => {
                 const p = expandPaths();
                 const avail = Math.max(20, (cols || 80) - 8);
-                const wrapPath = (label, val) => {
-                  const head = `  ${label}: ${val}`;
-                  const w = termLen(head);
-                  if (w <= avail) return [head];
-                  // 折行：label 单独一行，路径下一行缩进
-                  return [
-                    `  ${label}:`,
-                    `    ${val}`,
-                  ];
-                };
-                const lines = [];
+                const CAT_COLORS = ["#58a6ff", "#3fb950", "#d29922", "#f783ac", "#a371f7", "#79c0ff", "#e6edf3", "#f0883e", "#56d364"];
+                let ci = 0;
+                const results = [];
                 for (const e of p.entries) {
-                  lines.push(...wrapPath(e.label, e.path));
-                  // 自定义工具：列出安装的工具
+                  const color = CAT_COLORS[ci % CAT_COLORS.length];
+                  const short = e.label.replace(/ \/ .+$/, ""); // 只取中文部分
+                  const head = `  [${short}]`;
+                  const val = e.path;
+                  if (termLen(head + " " + val) <= avail - 2) {
+                    results.push(<Text key={e.label}><Text color={color} bold>{head}</Text><Text color="#c9d1d9"> {val}</Text></Text>);
+                  } else {
+                    results.push(<Text key={e.label}><Text color={color} bold>{head}</Text></Text>);
+                    results.push(<Text key={e.label + "_v"} color="#c9d1d9">    {val}</Text>);
+                  }
+                  ci++;
                   if (e.label === "自定义工具 / Tools") {
                     try {
                       const saved = Tools.listCustomTools();
-                      if (!saved.length) {
-                        lines.push("    (无 / none)");
-                      } else {
+                      if (saved.length) {
                         for (const s of saved) {
-                          if (!s.tools || s.tools.length === 0) {
-                            lines.push(`    [${s.file}] (无工具导出)`);
-                          } else {
+                          if (s.tools && s.tools.length > 0) {
                             for (const t of s.tools) {
-                              const toolLine = `    ${t.name}${t.desc ? "  —  " + t.desc : ""}`;
-                              if (termLen(toolLine) <= avail) {
-                                lines.push(toolLine);
+                              const tl = `    ${t.name}${t.desc ? "  —  " + t.desc : ""}`;
+                              if (termLen(tl) <= avail) {
+                                results.push(<Text key={t.name} color="#c9d1d9">{tl}</Text>);
                               } else {
-                                lines.push(`    ${t.name}:`);
-                                if (t.desc) lines.push(`      ${t.desc}`);
+                                results.push(<Text key={t.name + "_h"} color="#58a6ff">    {t.name}:</Text>);
+                                if (t.desc) results.push(<Text key={t.name + "_d"} color="#c9d1d9">      {t.desc}</Text>);
                               }
                             }
                           }
@@ -1345,9 +1368,7 @@ function App() {
                     } catch (_) {}
                   }
                 }
-                return (
-                  <Text color="#c9d1d9">{lines.join("\n")}</Text>
-                );
+                return results;
               })()}
             </Box>
           </Box>
@@ -1424,7 +1445,7 @@ function App() {
             <Box paddingLeft={1}><Text color="#6e7681">  ▼ {slashFiltered.length - slashScroll - SLASH_PAGE} more below</Text></Box>
           )}
           <Box paddingLeft={1}>
-            <Text color="cyan" dimColor>  ↑↓ Navigate · Enter Select · 🖱 Scroll</Text>
+            <Text color="cyan" dimColor>  ↑↓ Navigate · Enter Select</Text>
           </Box>
         </Box>
       )}
