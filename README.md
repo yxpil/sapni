@@ -1,3 +1,5 @@
+> **迁移公告**：sapni（栖梦）已迁移至 [BIT](https://github.com/yxpil/bit)（官网 [osbt.space](https://osbt.space)）。第一代终端交互助手与第二代架构（v1.1：MCP 支持 / 五层记忆 / 目标管理 / 崩溃恢复）的全部能力由 BIT 继承并继续演进。
+
 # Sapni（栖梦）— 自进化AI编程助手
 [网址](https://sapni.yxpil.com)
 > v1.1.21 · Self-Evolving AI · Terminal Agent · OpenAI Compatible API Server · Windows/macOS/Linux
