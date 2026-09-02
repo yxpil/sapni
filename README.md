@@ -1,4 +1,6 @@
 > **迁移公告**：sapni（栖梦）已迁移至 [BIT](https://github.com/yxpil/bit)（官网 [osbt.space](https://osbt.space)）。第一代终端交互助手与第二代架构（v1.1：MCP 支持 / 五层记忆 / 目标管理 / 崩溃恢复）的全部能力由 BIT 继承并继续演进。
+>
+> **Migration Notice**: sapni has moved to [BIT](https://github.com/yxpil/bit) (website: [osbt.space](https://osbt.space)). Everything from the first-generation terminal assistant and the second-generation architecture (v1.1: MCP support, five-layer memory, goal management, crash recovery) is inherited and still evolving in BIT.
 
 # Sapni（栖梦）— 自进化AI编程助手
 [网址](https://sapni.yxpil.com)
