@@ -23,6 +23,7 @@
     "postinstall": "node install.cjs",
     "start": "npx tsx Src/index.jsx",
     "server": "npx tsx Src/cli.js -s",
+    "test": "node --test --test-force-exit \"tests/**/*.test.cjs\"",
     "lint": "node --check Src/agent.cjs && node --check Src/llm.cjs && node --check Tools/index.js && node --check Tools/extended_tools.js && node --check Tools/search_tools.js && node --check Tools/browser.js && node --check Tools/file_tools.js && node --check Tools/edit_tools.js && node --check Tools/tokenizer.js && node --check Mem/index.js && node --check Mem/history.js"
   },
   "keywords": [
