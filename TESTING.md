@@ -1,5 +1,13 @@
 # sapni 测试说明
 
+- 测试完成：是（2026-10-04）
+- 测试日期：2026-10-04
+- 测试内容：单元：行编辑/读取/范围搜索、use_template 模板引擎
+- 运行命令：npm test
+- 测试框架：Node 内置 node:test (.cjs)
+- 模型：豆包（Doubao）生成
+
+
 Sapni — Self-Evolving AI Terminal Assistant。测试基于 Node.js 内置运行器 `node --test`，**只覆盖无重依赖的纯工具模块**，不需要安装 express/ink/react/puppeteer 等运行时依赖。
 
 ## 运行方式
